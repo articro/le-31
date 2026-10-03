@@ -24,7 +24,13 @@ const TR := {
 		"controls": "ZQSD / WASD / flèches : marcher · MAJ : courir (endurance !) · SOURIS : regarder · G : lampe torche · E : lancer un bonbon · V : grain VHS · ÉCHAP : pause",
 		"rules_tip": "Lis la pancarte. Obéis.",
 		"exit_lbl": "SORTIE",
-		"progress": "SORTIE : %d/%d",
+		"progress": "SORTIE : %d m",
+		"obj_heart": "ELLE EST AVEUGLE. Elle entend ton c\u0153ur. Atteins la porte de sortie.",
+		"hint_listen": "Elle t'entend : marche doucement, ou arrete-toi pour calmer ton c\u0153ur.",
+		"arch_closed": "Refuge ferme derriere toi. Elle ne passera pas.",
+		"graze": "Le bonbon Caramel t'arrache a ses griffes !",
+		"noise_lbl": "BRUIT",
+		"dead3": "Trop de fois attrapee. Le couloir te garde.",
 		"win": "TU ES SORTI·E",
 		"win_sub": "La maison te laissera partir… cette fois.",
 		"dead": "RATTRAPÉ·E",
@@ -110,7 +116,13 @@ const TR := {
 		"controls": "WASD / ZQSD / arrows: walk · SHIFT: run (stamina!) · MOUSE: look · G: flashlight · E: throw candy · V: VHS grain · ESC: pause",
 		"rules_tip": "Read the sign. Obey.",
 		"exit_lbl": "EXIT",
-		"progress": "EXIT: %d/%d",
+		"progress": "EXIT: %d m",
+		"obj_heart": "SHE IS BLIND. She hears your heart. Reach the exit door.",
+		"hint_listen": "She hears you: walk slowly, or stop to calm your heart.",
+		"arch_closed": "Safe room sealed behind you. She cannot follow.",
+		"graze": "The Caramel candy tears you from her grasp!",
+		"noise_lbl": "NOISE",
+		"dead3": "Caught too many times. The corridor keeps you.",
 		"win": "YOU GOT OUT",
 		"win_sub": "The house lets you leave… this time.",
 		"dead": "CAUGHT",
@@ -227,6 +239,21 @@ var bob := 0.0
 var prev_t := 0.0
 var far_reached := false
 var progress := 0
+var section := 0
+var noise := 0.0
+var bait_t := -1.0
+var bait_timer := 0.0
+var alert_t := 0.0
+var entity_mode := 0
+var patrol_dir := 1.0
+var graze := 0
+var catches := 0
+var arch_closed := [false, false, false]
+var creak_planks: Array = []
+var arch_nodes: Array = []
+var plank_nodes: Array = []
+const ARCH_T := [10.0, 20.0, 30.0]
+const EXIT_T := 37.0
 var mistakes := 0
 var loops := 0
 var anomaly := ""
@@ -284,10 +311,14 @@ var candy_timer := 0.0
 var mirror_timer := 0.0
 var entity_stun := 0.0
 var pocket_lbl: Label = null
+var noise_bg: ColorRect = null
+var noise_fill: ColorRect = null
+var noise_lbl: Label = null
 var poster_base := "poster_a"
 var wind_pl: AudioStreamPlayer = null
 var house_pl: AudioStreamPlayer = null
 var tension_pl: AudioStreamPlayer = null
+var music_pl: AudioStreamPlayer = null
 const CANDY_IDS := ["miroir", "reglisse", "caramel", "sucre"]
 const AUDIT_LIST := ["poster", "pumpkin", "light", "figure", "rules", "door", "whisper", "stain", "flip", "flicker", "cross", "extradoor", "chase"]
 
@@ -941,15 +972,63 @@ func _build_player() -> void:
 	var sleeve := _simple(Color(0.12, 0.10, 0.14), 0.8)
 	var skin := _simple(Color(0.72, 0.55, 0.45), 0.6)
 	for s2 in [-1, 1]:
-		var arm := _box(Vector3(0.075, 0.075, 0.34), sleeve)
-		arm.position = Vector3(s2 * 0.26, -0.06, 0.10)
-		arm.rotation = Vector3(-0.35, s2 * 0.18, 0)
+		var arm := _box(Vector3(0.075, 0.075, 0.30), sleeve)
+		arm.position = Vector3(s2 * 0.26, -0.07, 0.12)
+		arm.rotation = Vector3(-0.30, s2 * 0.16, 0)
 		hands.add_child(arm)
-		var hd := _box(Vector3(0.062, 0.085, 0.11), skin)
-		hd.position = Vector3(s2 * 0.24, -0.02, -0.10)
-		hd.rotation = Vector3(-0.5, s2 * 0.15, 0)
-		hands.add_child(hd)
+		var cuff := _box(Vector3(0.085, 0.085, 0.05), sleeve)
+		cuff.position = Vector3(s2 * 0.25, -0.045, -0.02)
+		cuff.rotation = Vector3(-0.4, s2 * 0.15, 0)
+		hands.add_child(cuff)
+		var palm := _box(Vector3(0.062, 0.028, 0.085), skin)
+		palm.position = Vector3(s2 * 0.24, -0.03, -0.09)
+		palm.rotation = Vector3(-0.55, s2 * 0.12, 0)
+		hands.add_child(palm)
+		for f in range(4):
+			var fg := _box(Vector3(0.014, 0.014, 0.075), skin)
+			fg.position = Vector3(s2 * (0.215 + f * 0.017), -0.055, -0.16)
+			fg.rotation = Vector3(-0.95 - f * 0.06, s2 * 0.10, 0)
+			hands.add_child(fg)
+		var th := _box(Vector3(0.016, 0.016, 0.055), skin)
+		th.position = Vector3(s2 * 0.20, -0.035, -0.10)
+		th.rotation = Vector3(-0.5, s2 * 0.55, 0)
+		hands.add_child(th)
 	_respawn()
+
+
+func _close_arch(i: int) -> void:
+	arch_closed[i] = true
+	section = i + 1
+	var at := _t_to_pos(ARCH_T[i])
+	var n := Node3D.new()
+	n.position = Vector3(at.x, 0, at.y)
+	n.rotation = Vector3(0, _ang_at(ARCH_T[i]), 0)
+	var dm := _box(Vector3(0.14, 2.6, CORR_HALF * 2 + 0.2), _pbr("door"))
+	dm.position = Vector3(0, 1.3, 0)
+	n.add_child(dm)
+	world.add_child(n)
+	arch_nodes.append(n)
+	_collider_box(Vector3(0.5, 3.0, CORR_HALF * 2 + 0.4), Vector3(at.x, 1.5, at.y))
+	play("creak", -6.0, 0.7)
+	_toast(tt("arch_closed"), 3.5)
+	_offer_candy()
+	if entity != null:
+		var eseg := 0
+		for k in range(ARCH_T.size()):
+			if entity_t >= ARCH_T[k]:
+				eseg = k + 1
+		if eseg != section:
+			entity_mode = 0
+			alert_t = 0.0
+
+
+func _respawn_at(at: float) -> void:
+	var p := _t_to_pos(at)
+	player.position = Vector3(p.x, 0, p.y)
+	yaw = _ang_at(at)
+	pitch = 0.0
+	prev_t = at
+	far_reached = false
 
 
 func _respawn() -> void:
@@ -1092,7 +1171,22 @@ func _build_ui() -> void:
 	stam_fill.size = Vector2(160, 6)
 	stam_fill.color = Color(0.85, 0.6, 0.3, 0.8)
 	ui.add_child(stam_fill)
-	hud_nodes = [hud_lbl, hint_lbl, ts_lbl, banner_lbl, toast_lbl, cap_lbl, obj_lbl, osd_lbl, stam_bg, stam_fill, pocket_lbl]
+	noise_bg = ColorRect.new()
+	noise_bg.position = Vector2(12, 674)
+	noise_bg.size = Vector2(164, 10)
+	noise_bg.color = Color(0, 0, 0, 0.5)
+	ui.add_child(noise_bg)
+	noise_fill = ColorRect.new()
+	noise_fill.position = Vector2(14, 676)
+	noise_fill.size = Vector2(0, 6)
+	noise_fill.color = Color(0.85, 0.18, 0.12, 0.85)
+	ui.add_child(noise_fill)
+	noise_lbl = Label.new()
+	noise_lbl.position = Vector2(180, 668)
+	noise_lbl.text = tt("noise_lbl")
+	noise_lbl.add_theme_color_override("font_color", Color(0.85, 0.3, 0.22))
+	ui.add_child(noise_lbl)
+	hud_nodes = [hud_lbl, hint_lbl, ts_lbl, banner_lbl, toast_lbl, cap_lbl, obj_lbl, osd_lbl, stam_bg, stam_fill, pocket_lbl, noise_bg, noise_fill, noise_lbl]
 	# menu principal : le couloir vit derrière (caméra qui dérive)
 	title_ctl = Control.new()
 	title_ctl.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -1417,7 +1511,9 @@ func _apply_volumes() -> void:
 	if house_pl != null:
 		house_pl.volume_db = -12.0 + linear_to_db(maxf(vol_sfx, 0.001))
 	if tension_pl != null:
-		tension_pl.volume_db = -6.0 + linear_to_db(maxf(vol_music, 0.001)) + linear_to_db(maxf(vol_music, 0.001))
+		tension_pl.volume_db = -6.0 + linear_to_db(maxf(vol_music, 0.001))
+	if music_pl != null:
+		music_pl.volume_db = -9.0 + linear_to_db(maxf(vol_music, 0.001)) + linear_to_db(maxf(vol_music, 0.001))
 
 
 func _save_settings() -> void:
@@ -1549,6 +1645,7 @@ func _begin_run() -> void:
 	if entity != null:
 		entity.queue_free()
 		entity = null
+		entity = null
 	state = "play"
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	f_first_anom = false
@@ -1556,6 +1653,66 @@ func _begin_run() -> void:
 	anom_timer = 0.0
 	candies = {}
 	pocket = 1
+	section = 0
+	noise = 0.0
+	bait_timer = 0.0
+	alert_t = 0.0
+	entity_mode = 0
+	patrol_dir = 1.0
+	graze = 0
+	catches = 0
+	arch_closed = [false, false, false]
+	for a in arch_nodes:
+		if is_instance_valid(a):
+			a.queue_free()
+	arch_nodes.clear()
+	for pkn in plank_nodes:
+		if is_instance_valid(pkn):
+			pkn.queue_free()
+	plank_nodes.clear()
+	creak_planks.clear()
+	var pk := 5.0
+	while pk < EXIT_T - 2.0:
+		var okp := true
+		for a in ARCH_T:
+			if absf(pk - a) < 1.6:
+				okp = false
+		if okp:
+			creak_planks.append(pk)
+			var pp := _t_to_pos(pk)
+			var pq := _quad(Vector2(0.34, CORR_HALF * 1.2), _simple(Color(0.06, 0.045, 0.035), 0.95))
+			pq.rotation = Vector3(PI / 2, _ang_at(pk), 0)
+			pq.position = Vector3(pp.x, 0.012, pp.y)
+			world.add_child(pq)
+			plank_nodes.append(pq)
+		pk += rng.randf_range(4.0, 6.5)
+	if exit_door != null and is_instance_valid(exit_door):
+		exit_door.queue_free()
+	exit_door = Node3D.new()
+	var epos := _t_to_pos(EXIT_T)
+	exit_door.position = Vector3(epos.x, 0, epos.y)
+	exit_door.rotation = Vector3(0, _ang_at(EXIT_T), 0)
+	var eq := _quad(Vector2(1.15, 2.2), _emissive(Color(1, 0.85, 0.55), 2.2, "res://assets/tex/exit.png"))
+	eq.rotation = Vector3(PI / 2, 0, 0)
+	eq.position = Vector3(0, 1.1, 0)
+	exit_door.add_child(eq)
+	var el := OmniLight3D.new()
+	el.light_color = Color(1.0, 0.8, 0.5)
+	el.light_energy = 2.5
+	el.omni_range = 5.0
+	el.position = Vector3(0, 1.6, 0.6)
+	exit_door.add_child(el)
+	world.add_child(exit_door)
+	_draw_loop()
+	if entity == null:
+		_spawn_chaser()
+		entity_t = 6.0
+	entity.visible = true
+	for a in arch_nodes:
+		a.queue_free()
+	arch_nodes.clear()
+	entity_mode = 0
+	entity_t = 6.0
 	poster_base = ["poster_a", "poster_c"][rng.randi_range(0, 1)]
 	candy_offer = []
 	candy_timer = 0.0
@@ -1564,7 +1721,7 @@ func _begin_run() -> void:
 	_respawn()
 	_roll_anomaly()
 	_draw_loop()
-	_banner(tt("obj_banner"), 10.0)
+	_banner(tt("obj_heart"), 9.0)
 	obj_lbl.text = tt("obj_short")
 	obj_lbl.visible = hud_on
 	if not f_arrow:
@@ -1600,8 +1757,15 @@ func _begin_run() -> void:
 		add_child(tension_pl)
 		tension_pl.stream = load("res://assets/audio/tension.wav")
 		tension_pl.stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	if music_pl == null:
+		music_pl = AudioStreamPlayer.new()
+		music_pl.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
+		add_child(music_pl)
+		music_pl.stream = load("res://assets/audio/music.wav")
+		music_pl.stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
 	_apply_volumes()
 	wind_pl.play()
+	music_pl.play()
 	house_pl.play()
 
 
@@ -1626,6 +1790,8 @@ func _to_title() -> void:
 		house_pl.stop()
 	if tension_pl != null:
 		tension_pl.stop()
+	if music_pl != null:
+		music_pl.stop()
 
 
 func _roll_anomaly() -> void:
@@ -1742,22 +1908,38 @@ func _blackout(reroll: bool) -> void:
 
 
 func _caught() -> void:
+	catches += 1
 	if dbg != "":
-		print("EVT CAUGHT")
-	state = "dead"
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	scare_rect.visible = true
+		print("EVT CAUGHT n=", catches)
 	play("scare", 0.0)
-	var tw := create_tween()
-	tw.tween_interval(0.75)
-	tw.tween_callback(func():
+	scare_rect.visible = true
+	if catches >= 3:
+		state = "dead"
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		var tw := create_tween()
+		tw.tween_interval(0.75)
+		tw.tween_callback(func():
+			scare_rect.visible = false
+			end_ctl.visible = true
+			end_ctl.get_node("Title").text = tt("dead")
+			end_ctl.get_node("Title").add_theme_color_override("font_color", Color(0.85, 0.15, 0.12))
+			end_ctl.get_node("Sub").text = tt("dead3")
+			end_ctl.get_node("Stats").text = tt("loops") % [catches, section]
+			end_ctl.get_node("Replay").text = tt("replay"))
+		return
+	locked = true
+	var tw2 := create_tween()
+	tw2.tween_interval(0.55)
+	tw2.tween_callback(func():
 		scare_rect.visible = false
-		end_ctl.visible = true
-		end_ctl.get_node("Title").text = tt("dead")
-		end_ctl.get_node("Title").add_theme_color_override("font_color", Color(0.85, 0.15, 0.12))
-		end_ctl.get_node("Sub").text = tt("dead_sub")
-		end_ctl.get_node("Stats").text = tt("loops") % [loops, mistakes]
-		end_ctl.get_node("Replay").text = tt("replay"))
+		var at: float = 1.0 if section == 0 else ARCH_T[section - 1] + 1.0
+		_respawn_at(at)
+		entity_mode = 0
+		alert_t = 0.0
+		entity_t = fmod(at + 6.0, PERIM)
+		noise = 0.0
+		stamina = maxf(stamina, 0.6)
+		locked = false)
 
 
 func _win() -> void:
@@ -1770,7 +1952,7 @@ func _win() -> void:
 	end_ctl.get_node("Title").text = tt("win")
 	end_ctl.get_node("Title").add_theme_color_override("font_color", Color(0.95, 0.6, 0.2))
 	end_ctl.get_node("Sub").text = tt("win_sub")
-	end_ctl.get_node("Stats").text = tt("loops") % [loops, mistakes]
+	end_ctl.get_node("Stats").text = tt("loops") % [catches, section]
 	end_ctl.get_node("Replay").text = tt("replay")
 	get_tree().create_timer(2.5).timeout.connect(func():
 		if state == "win":
@@ -1800,10 +1982,12 @@ func _unhandled_input(ev: InputEvent) -> void:
 				candy_offer = []
 				candy_timer = 0.0
 				return
-			if ev.keycode == KEY_E and chasing and pocket > 0:
+			if ev.keycode == KEY_E and pocket > 0:
 				pocket -= 1
-				entity_stun = 2.5
-				play("creak", -6.0)
+				var pt0 := _pos_to_t(Vector2(player.position.x, player.position.z))
+				bait_t = fmod(pt0 + 3.0, PERIM)
+				bait_timer = 4.0
+				play("creak", -6.0, 1.3)
 				_toast(tt("candy_throw"), 3.0)
 			if ev.keycode == KEY_V:
 				vhs.visible = not vhs.visible
@@ -1856,6 +2040,8 @@ func _toggle_quality() -> void:
 
 # ============================================================ process =====
 func _process(d: float) -> void:
+	if dbg == "audit":
+		_dbg_audit(d)
 	if vhs.material:
 		vhs.material.set_shader_parameter("time", Time.get_ticks_msec() / 1000.0)
 	if state == "intro":
@@ -1880,10 +2066,7 @@ func _process(d: float) -> void:
 		return
 	if locked:
 		return
-	if dbg == "audit":
-		_dbg_audit(d)
-		return
-	if dbg != "":
+	if dbg != "" and dbg != "audit":
 		_dbg_walk(d)
 	run_time += d
 	var secs := int(run_time) + 23 * 3600 + 41 * 60
@@ -1968,51 +2151,111 @@ func _process(d: float) -> void:
 	prev_t = t
 	if t > 12.0:
 		far_reached = true
-	if prev > PERIM - 4.0 and t < 4.0:
-		_evaluate_pass()
-	elif t < 2.2 and far_reached:
-		_evaluate_return()
+	var target_noise := 0.03
+	if mv.length_squared() > 0.01:
+		target_noise = 1.0 if want_sprint else 0.32
+	if stamina < 0.5:
+		target_noise += 0.35
+	if stamina < 0.25:
+		target_noise += 0.25
+	if candies.get("sucre", false):
+		target_noise *= 0.7
+	noise = lerpf(noise, target_noise, 0.15)
+	for pk in creak_planks:
+		if prev < pk and t >= pk:
+			play("creak", -8.0, 0.8)
+			noise = maxf(noise, 1.2)
+			alert_t = maxf(alert_t, 1.5)
+	for i in range(ARCH_T.size()):
+		if not arch_closed[i] and prev < ARCH_T[i] and t >= ARCH_T[i]:
+			_close_arch(i)
+	if t > EXIT_T and prev <= EXIT_T:
+		_win()
+		return
 	if exit_door != null and (Vector2(player.position.x, player.position.z) - Vector2(exit_door.position.x, exit_door.position.z)).length() < 1.5:
 		_win()
 		return
-	if entity != null and not chasing and cross_state == 0:
-		if (player.position - entity.position).length() < 6.0:
-			entity.visible = false
-	if entity != null and (chasing or cross_state == 2):
+	if entity == null or not is_instance_valid(entity):
+		_spawn_chaser()
+	var pt: float = t
+	var seg0: float = 0.0 if section == 0 else ARCH_T[section - 1]
+	var seg1: float = PERIM if section >= ARCH_T.size() else ARCH_T[section]
+	var eseg := 0
+	for i in range(ARCH_T.size()):
+		if entity_t >= ARCH_T[i]:
+			eseg = i + 1
+	var dist: float = absf(fmod(pt - entity_t + PERIM * 1.5, PERIM) - PERIM / 2.0)
+	if eseg != section:
+		dist = 999.0
+	var hear_r := noise * 14.0
+	if dbg == "smart":
+		hear_r = 0.0
+	if bait_timer > 0.0:
+		bait_timer -= d
+		entity_mode = 1
+		var bd := fmod(bait_t - entity_t + PERIM * 1.5, PERIM) - PERIM / 2.0
+		entity_t = fmod(entity_t + clampf(bd, -2.2 * d, 2.2 * d) + PERIM, PERIM)
+		if absf(bd) < 0.8:
+			bait_timer = 0.0
+	elif entity_stun > 0.0:
+		entity_stun -= d
+	elif entity_mode == 2:
+		var dif2 := fmod(pt - entity_t + PERIM * 1.5, PERIM) - PERIM / 2.0
+		var cspeed := 2.6 if candies.get("reglisse", false) else 2.1
+		entity_t = fmod(entity_t + clampf(dif2, -cspeed * d, cspeed * d) + PERIM, PERIM)
+		if dist > 13.0:
+			entity_mode = 0
+	elif dist < hear_r:
+		entity_mode = 1
+		alert_t += d
+		var dif3 := fmod(pt - entity_t + PERIM * 1.5, PERIM) - PERIM / 2.0
+		entity_t = fmod(entity_t + clampf(dif3, -1.5 * d, 1.5 * d) + PERIM, PERIM)
+		if dist < 5.0 or alert_t > 5.0:
+			entity_mode = 2
+			alert_t = 0.0
+	else:
+		alert_t = maxf(0.0, alert_t - d * 2.0)
+		if entity_mode == 1:
+			entity_mode = 0
+		entity_t += patrol_dir * 0.9 * d
+		if entity_t > seg1 - 1.5 and eseg == section:
+			patrol_dir = -1.0
+		if entity_t < seg0 + 1.5 and eseg == section:
+			patrol_dir = 1.0
+		entity_t = fmod(entity_t + PERIM, PERIM)
+	var ec := _t_to_pos(entity_t)
+	entity.position = Vector3(ec.x, 0, ec.y)
+	entity.visible = eseg == section
+	if entity.visible:
 		entity.look_at(Vector3(player.position.x, entity.position.y, player.position.z), Vector3.UP)
-	if chasing:
-		if entity == null:
-			_spawn_chaser()
-		var pt := _pos_to_t(Vector2(player.position.x, player.position.z))
-		var dif := fmod(pt - entity_t + PERIM, PERIM)
-		if dif > PERIM / 2:
-			dif -= PERIM
-		if entity_stun > 0.0:
-			entity_stun -= d
+	if dist < 1.1 and entity.visible and dbg != "smart":
+		if candies.get("caramel", false) and graze == 0:
+			graze = 1
+			entity_mode = 0
+			entity_t = fmod(entity_t + 9.0, PERIM)
+			play("sting", -6.0)
+			_toast(tt("graze"), 4.0)
 		else:
-			var cspeed := 1.7 if candies.get("reglisse", false) else 2.3
-			entity_t = fmod(entity_t + clampf(dif, -cspeed * d, cspeed * d), PERIM)
-		var ec := _t_to_pos(entity_t)
-		if entity != null:
-			entity.position = Vector3(ec.x, 0, ec.y)
-			entity.visible = true
-		if absf(dif) < 1.1:
 			_caught()
 			return
+	if dist < 9.0 and entity.visible and fmod(run_time, 1.3) < d:
+		play("whisper", -18.0 + dist)
+	if entity_mode == 2:
 		if fmod(Time.get_ticks_msec() / 1000.0, 1.4) < d:
 			play("heart", -4.0)
 		hint_lbl.text = tt("hint_run")
-	elif anomaly != "":
-		hint_lbl.text = tt("rules_tip") if loops == 0 else ""
+	elif noise > 0.6:
+		hint_lbl.text = tt("hint_listen")
 	else:
-		hint_lbl.text = tt("hint_move") if run_time < 8.0 else ("" if progress < GOAL else ">> " + tt("exit_lbl") + " <<")
+		hint_lbl.text = tt("hint_move") if run_time < 6.0 else ""
+		hint_lbl.text = tt("hint_run")
 	if anomaly != "" and not chasing and not f_first_anom:
 		anom_timer += d
 		if anom_timer > 6.0:
 			_banner(tt("banner_first_anom"), 6.0)
 			f_first_anom = true
 	if ghost_arrow != null and is_instance_valid(ghost_arrow):
-		ghost_arrow.visible = loops == 0 and hud_on
+		ghost_arrow.visible = hud_on
 		var tg := fmod(t + 2.6, PERIM)
 		var cg := _t_to_pos(tg)
 		ghost_arrow.position = Vector3(cg.x, 0.03, cg.y)
@@ -2047,8 +2290,10 @@ func _process(d: float) -> void:
 			whisper_timer = rng.randf_range(3.0, 7.0)
 			play("whisper", -6.0)
 	elif mistakes >= 2 and rng.randf() < d * 0.03:
-		play("whisper", -14.0)
-	hud_lbl.text = tt("progress") % [progress, GOAL]
+		play("whisper", -18.0)
+	hud_lbl.text = tt("progress") % int(maxf(0.0, EXIT_T - prev_t))
+	if noise_fill != null:
+		noise_fill.size.x = 160.0 * clampf(noise, 0.0, 1.0)
 
 
 # ============================================================ debug =======
@@ -2064,27 +2309,65 @@ func _dbg_walk(d: float) -> void:
 
 
 func _dbg_audit(d: float) -> void:
-	if audit_i >= AUDIT_LIST.size():
-		print("AUDIT ALL OK")
-		get_tree().quit(0)
-		return
 	audit_timer -= d
 	if audit_timer > 0.0:
-		if AUDIT_LIST[audit_i - 1] == "cross":
-			dbg_t = 15.0
-			var c := _t_to_pos(dbg_t)
-			player.position = Vector3(c.x, 0, c.y)
 		return
-	anomaly = AUDIT_LIST[audit_i]
-	chasing = anomaly == "chase"
-	_draw_loop()
-	if chasing:
-		chasing = true
-		entity_t = 10.0
-	dbg_t = 2.0
-	var c := _t_to_pos(dbg_t)
-	player.position = Vector3(c.x, 0, c.y)
-	prev_t = dbg_t
-	print("AUDIT ok ", anomaly)
-	audit_timer = 1.2
+	audit_timer = 0.7
+	var fail := ""
+	match audit_i:
+		0:
+			if not (ARCH_T.size() == 3 and EXIT_T > ARCH_T[2]):
+				fail = "geometry"
+		1:
+			_close_arch(0)
+			if not (arch_closed[0] and section == 1):
+				fail = "arch"
+			if entity == null or not is_instance_valid(entity):
+				_spawn_chaser()
+			entity_t = 5.0
+			entity_mode = 0
+		2:
+			pass
+		3:
+			var e2 := 0
+			for k2 in range(ARCH_T.size()):
+				if entity_t >= ARCH_T[k2]:
+					e2 = k2 + 1
+			print("DBG3 entity_t=", entity_t, " eseg=", e2, " section=", section, " vis=", entity.visible)
+			pocket = 2
+			bait_t = 16.0
+			bait_timer = 4.0
+			entity_t = 12.0
+		4:
+			if absf(entity_t - 16.0) > 4.5:
+				fail = "bait"
+			bait_timer = 0.0
+			noise = 1.0
+			stamina = 0.1
+			var p15 := _t_to_pos(15.0)
+			player.position = Vector3(p15.x, 0, p15.y)
+			prev_t = 15.0
+			entity_t = 18.0
+			entity_mode = 0
+		5:
+			var d5: float = absf(fmod(prev_t - entity_t + PERIM * 1.5, PERIM) - PERIM / 2.0)
+			print("DBG5 noise=", noise, " stamina=", stamina, " dist=", d5, " mode=", entity_mode, " catches=", catches, " entity_t=", entity_t, " prev_t=", prev_t, " section=", section)
+			if entity_mode < 1 and catches < 1:
+				fail = "hear"
+			entity_t = prev_t
+		6:
+			if catches < 1:
+				fail = "caught"
+			prev_t = EXIT_T - 0.2
+			var pe := _t_to_pos(EXIT_T + 0.3)
+			player.position = Vector3(pe.x, 0, pe.y)
+		7:
+			if state != "win":
+				fail = "win"
+			else:
+				print("AUDIT ALL OK")
+				get_tree().quit(0)
+	if fail != "":
+		print("AUDIT FAIL step=", audit_i, " ", fail)
+		get_tree().quit(1)
 	audit_i += 1
