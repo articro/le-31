@@ -276,6 +276,7 @@ var stam_fill: ColorRect = null
 var hands: Node3D = null
 var headlamp: SpotLight3D = null
 var headlamp_on := true
+var dust: GPUParticles3D = null
 var candies := {}
 var pocket := 1
 var candy_offer := []
@@ -910,6 +911,30 @@ func _build_player() -> void:
 	headlamp.shadow_enabled = false
 	headlamp.position = Vector3(0, -0.05, 0)
 	cam.add_child(headlamp)
+	dust = GPUParticles3D.new()
+	dust.amount = 140
+	dust.lifetime = 6.0
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	pm.emission_box_extents = Vector3(1.3, 1.0, 2.2)
+	pm.spread = 180.0
+	pm.direction = Vector3(0, 0, 0)
+	pm.initial_velocity_min = 0.02
+	pm.initial_velocity_max = 0.07
+	pm.gravity = Vector3(0, 0, 0)
+	pm.scale_min = 0.6
+	pm.scale_max = 1.5
+	var dsm := StandardMaterial3D.new()
+	dsm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	dsm.albedo_color = Color(1.0, 0.97, 0.9, 0.55)
+	dsm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	var qm := QuadMesh.new()
+	qm.size = Vector2(0.02, 0.02)
+	qm.material = dsm
+	dust.draw_pass_1 = qm
+	dust.process_material = pm
+	dust.position = Vector3(0, 0, -2.2)
+	cam.add_child(dust)
 	hands = Node3D.new()
 	hands.position = Vector3(0, -0.36, -0.55)
 	cam.add_child(hands)
@@ -1788,6 +1813,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 			if ev.keycode == KEY_G:
 				headlamp_on = not headlamp_on
 				headlamp.visible = headlamp_on
+				dust.emitting = headlamp_on
 				play("creak", -14.0, 1.6)
 			if ev.keycode == KEY_F1:
 				hud_on = not hud_on
@@ -1906,6 +1932,7 @@ func _process(d: float) -> void:
 		else:
 			stamina = minf(1.0, stamina + d * 0.16)
 		mv = mv.normalized() * (5.6 if want_sprint else 3.4)
+		cam.fov = lerpf(cam.fov, 78.0 + (5.0 if want_sprint else 0.0) + (1.5 if stamina < 0.2 else 0.0), 0.1)
 		player.velocity = Vector3(mv.x, 0, mv.z)
 		bob += d * (9.5 if want_sprint else 6.5)
 		if fmod(bob, TAU) < d * (9.5 if want_sprint else 6.5):
@@ -1924,6 +1951,7 @@ func _process(d: float) -> void:
 	if stamina < 0.25 and fmod(run_time, 1.3) < d:
 		play("heart", -6.0)
 	stam_fill.size.x = 160.0 * stamina
+	dust.emitting = headlamp_on and state == "play"
 	if tension_pl != null:
 		if chasing and not tension_pl.playing:
 			tension_pl.play()
