@@ -943,7 +943,7 @@ func _build_player() -> void:
 	headlamp.position = Vector3(0, -0.05, 0)
 	cam.add_child(headlamp)
 	dust = GPUParticles3D.new()
-	dust.amount = 140
+	dust.amount = 90
 	dust.lifetime = 6.0
 	var pm := ParticleProcessMaterial.new()
 	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
@@ -953,14 +953,14 @@ func _build_player() -> void:
 	pm.initial_velocity_min = 0.02
 	pm.initial_velocity_max = 0.07
 	pm.gravity = Vector3(0, 0, 0)
-	pm.scale_min = 0.6
-	pm.scale_max = 1.5
+	pm.scale_min = 0.4
+	pm.scale_max = 0.9
 	var dsm := StandardMaterial3D.new()
 	dsm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	dsm.albedo_color = Color(1.0, 0.97, 0.9, 0.55)
+	dsm.albedo_color = Color(1.0, 0.97, 0.9, 0.30)
 	dsm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	var qm := QuadMesh.new()
-	qm.size = Vector2(0.02, 0.02)
+	qm.size = Vector2(0.011, 0.011)
 	qm.material = dsm
 	dust.draw_pass_1 = qm
 	dust.process_material = pm
