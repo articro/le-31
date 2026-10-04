@@ -3,7 +3,7 @@
 
 ---
 Projet actif unique : **LE 31**, jeu d'horreur Halloween en Godot 4.3, repo GitHub `articro/le-31`.
-Lis d'abord `/home/user/doc/MEMOIRE_LE31.md` (mémoire complète : architecture, pièges, état GitHub) et `/home/user/doc/horreur_plan_halloween2026.md` §S9. Si ces fichiers sont absents, voici l'essentiel :
+Lis d'abord `/home/user/doc/MEMOIRE_LE31.md` (ou, si ce fichier n'existe pas chez toi : récupère https://raw.githubusercontent.com/articro/le-31-memoire/main/MEMOIRE_LE31.md — repo public, aucun token nécessaire) (mémoire complète : architecture, pièges, état GitHub) et `/home/user/doc/horreur_plan_halloween2026.md` §S9. Si ces fichiers sont absents, voici l'essentiel :
 
 - État : **v10 shippée** = release id 403000748, tag v10, assets `LE31_projet_godot_v10.zip` (47 853 009 o) + 6 png le31_v10_01_couloir_sombre/02_salon/03_cuisine/04_monstre_anime/05_etage/06_sortie. Release v9 = id 402871729. Arbre HEAD ~110 blobs.
 - Workspace : `/home/user/hantise/` (projet Godot, scripts/main.gd ~3 000 lignes = tout le jeu), `/home/user/doc/`, `/home/user/push_v10.sh <PAT>`.
