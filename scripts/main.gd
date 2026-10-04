@@ -18,7 +18,7 @@ const TR := {
 		"sub": "une nuit dans la maison hantée",
 		"play": "ENTRER",
 		"warn": "casque recommandé — ne joue pas dans le noir… ou si.",
-		"controls": "ZQSD / WASD / flèches : marcher · MAJ : courir (endurance !) · SOURIS : regarder · G : lampe torche · E : lancer un bonbon · V : grain VHS · ÉCHAP : pause",
+		"controls": "ZQSD / WASD / flèches : marcher · MAJ : courir (endurance !) · SOURIS : regarder · G : lampe torche · E : lancer un bonbon (diversion) · F : sucre collant (ralentit) · V : grain VHS · ÉCHAP : pause",
 		"rules_tip": "Lis la pancarte. Obéis.",
 		"exit_lbl": "SORTIE",
 		"progress": "SORTIE : %d m",
@@ -49,11 +49,11 @@ const TR := {
 		"menu_opt": "OPTIONS",
 		"menu_quit": "QUITTER",
 		"how_title": "COMMENT JOUER",
-		"how_1": "1. Traverse LA MAISON : salon, cuisine, salle de bains, garage, chambres, couloir… La porte de sortie est à l'EST (flèche au sol).",
-		"how_2": "2. ELLE est aveugle mais entend ton cœur et tes pas. Courir = du bruit = elle te traque.",
-		"how_3": "3. Ramasse les bonbons qui brillent (4 cachés). E = en lancer un pour l'attirer ailleurs.",
-		"how_4": "4. Certaines zones de plancher GRINCENT : évite-les, ou assume le bruit.",
-		"how_5": "5. Si elle te touche : tu te réveilles à l'entrée. 3 prises = c'est fini. Sors vivant.",
+		"how_1": "1. La maison est SOMBRE : ta lampe torche (G) est ta meilleure amie. La sortie est à l'EST — mais elle est VERROUILLÉE : trouve la clé dorée (position différente à chaque partie).",
+		"how_2": "2. ELLE est aveugle mais entend tes pas, et elle MARCHE et COURT comme une bête. Courir = du bruit = elle te traque. Le plancher grince par endroits.",
+		"how_3": "3. Bonbons (4) : E = diversion, F = piège de sucre collant qui la ralentit. Une 2e clé ouvre la chambre verrouillée (bonbon + placard à l'intérieur).",
+		"how_4": "4. 3 CACHETTES où elle ne peut rien : placards (chambre, garage) et le renfoncement sous l'escalier. Dedans, elle t'oublie — mais ne reste pas toute la nuit.",
+		"how_5": "5. Si elle te touche : tu te réveilles à l'entrée (3 points d'apparition aléatoires). 3 prises = c'est fini. Sors vivant.",
 		"obj_banner": "BUT : traverse si rien n'a changé · demi-tour si changé · 5 tours = sortie",
 		"hint_move": "ZQSD / WASD + SOURIS pour regarder · MAJ pour courir",
 		"toast_plus1": "BIEN. Rien n'avait changé. +1",
@@ -90,12 +90,20 @@ const TR := {
 		"opt_back": "RETOUR",
 		"back": "RETOUR",
 		"toast_arrow": "Suis la flèche orange au sol : elle montre le chemin (1er tour uniquement).",
-		"obj_short": "follow the floor arrow to the EAST door · walk quietly · E = throw candy",
+		"obj_short": "suis la flèche au sol vers la porte EST · sortie VERROUILLÉE : trouve la clé dorée · marche doucement · E = bonbon · F = piège collant",
 		"how_go": "C'EST PARTI",
 		"candy_title": "BONBON MAUDIT GAGNÉ — choisis : ",
 		"candy_got": "Tu gardes : %s",
 		"candy_throw": "Bonbon lancé ! ELLE s'arrête…",
-		"candy_pickup": "Bonbon ramassé ! E = le lancer pour faire diversion.",
+		"candy_pickup": "Bonbon ramassé ! E = le lancer pour faire diversion. F = piège collant.",
+		"locked": "VERROUILLÉE. Il faut la clé dorée… elle brille quelque part dans la maison.",
+		"unlocked": "Chambre déverrouillée.",
+		"key_pick_e": "CLÉ DE SORTIE ! La porte Est s'ouvre.",
+		"key_pick_c": "Clé de la chambre… la porte verrouillée du couloir Sud t'attend.",
+		"hidden_t": "Tu es caché. Elle ne peut rien contre toi ici. Ressors quand c'est calme.",
+		"glue_set": "Sucre collant posé ! Elle y restera engluée quelques secondes.",
+		"key_e_s": "clé sortie ✓",
+		"key_c_s": "clé chambre ✓",
 		"pocket": "bonbons : %d",
 		"cd_miroir_n": "Miroir",
 		"cd_miroir_d": "un murmure te prévient si quelque chose a changé",
@@ -111,7 +119,7 @@ const TR := {
 		"sub": "one night in the haunted house",
 		"play": "ENTER",
 		"warn": "headphones recommended — don't play in the dark… actually, do.",
-		"controls": "WASD / ZQSD / arrows: walk · SHIFT: run (stamina!) · MOUSE: look · G: flashlight · E: throw candy · V: VHS grain · ESC: pause",
+		"controls": "WASD / ZQSD / arrows: walk · SHIFT: run (stamina!) · MOUSE: look · G: flashlight · E: throw candy (decoy) · F: sticky sugar (slows her) · V: VHS grain · ESC: pause",
 		"rules_tip": "Read the sign. Obey.",
 		"exit_lbl": "EXIT",
 		"progress": "EXIT: %d m",
@@ -142,11 +150,11 @@ const TR := {
 		"menu_opt": "OPTIONS",
 		"menu_quit": "QUIT",
 		"how_title": "HOW TO PLAY",
-		"how_1": "1. Cross THE HOUSE: living room, kitchen, bathroom, garage, bedrooms, hallway… The exit door is EAST (floor arrow).",
-		"how_2": "2. SHE is blind but hears your heart and your steps. Sprint = noise = she hunts you.",
-		"how_3": "3. Pick up the glowing candies (4 hidden). E = throw one to lure her away.",
-		"how_4": "4. Some floor zones CREAK: avoid them, or own the noise.",
-		"how_5": "5. If she touches you: you wake at the entrance. 3 catches = game over. Get out alive.",
+		"how_1": "1. The house is DARK: your flashlight (G) is your best friend. The exit is EAST — but it's LOCKED: find the golden key (new spot every run).",
+		"how_2": "2. SHE is blind but hears your steps, and she WALKS and RUNS like a beast. Sprint = noise = she hunts you. Some floorboards creak.",
+		"how_3": "3. Candies (4): E = decoy, F = sticky sugar trap that slows her down. A 2nd key opens the locked bedroom (candy + wardrobe inside).",
+		"how_4": "4. 3 HIDING SPOTS where she can't reach you: wardrobes (bedroom, garage) and the nook under the stairs. Inside, she forgets you — but don't stay all night.",
+		"how_5": "5. If she touches you: you wake at the entrance (3 random spawn points). 3 catches = game over. Get out alive.",
 		"obj_banner": "GOAL: walk through if nothing changed · turn back if something did · 5 laps = exit",
 		"hint_move": "WASD / ZQSD + MOUSE to look · SHIFT to run",
 		"toast_plus1": "GOOD. Nothing had changed. +1",
@@ -188,7 +196,15 @@ const TR := {
 		"candy_title": "CURSED CANDY EARNED — pick: ",
 		"candy_got": "You keep: %s",
 		"candy_throw": "Candy thrown! SHE stops…",
-		"candy_pickup": "Candy picked up! E = throw it as a decoy.",
+		"candy_pickup": "Candy picked up! E = throw it as a decoy. F = sticky trap.",
+		"locked": "LOCKED. You need the golden key… it glows somewhere in the house.",
+		"unlocked": "Bedroom unlocked.",
+		"key_pick_e": "EXIT KEY! The East door will open.",
+		"key_pick_c": "Bedroom key… the locked door on the South corridor awaits.",
+		"hidden_t": "You are hidden. She can't reach you here. Leave when it's quiet.",
+		"glue_set": "Sticky sugar deployed! She'll be slowed to a crawl.",
+		"key_e_s": "exit key ✓",
+		"key_c_s": "room key ✓",
 		"pocket": "candies: %d",
 		"cd_miroir_n": "Mirror",
 		"cd_miroir_d": "a whisper warns you when something changed",
@@ -274,6 +290,8 @@ var dbg := ""
 var intro_t := 0.0
 var run_time := 0.0
 var flicker_idx := -1
+var flicker_t := 0.0
+var ent_phase := 0.0
 var cross_state := 0
 var cross_lat := 0.0
 var audit_i := 0
@@ -351,9 +369,9 @@ func _ready() -> void:
 	if dbg == "" and not how_seen:
 		howto_ctl.visible = true
 	if dbg != "":
-		_start("fr")
-		_begin_run()
-
+			_start("fr")
+			_begin_run()
+	
 
 # ============================================================ chemin ======
 
@@ -449,7 +467,7 @@ func _build_world() -> void:
 	env.background_color = Color(0.006, 0.006, 0.008)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.40, 0.33, 0.30)
-	env.ambient_light_energy = 0.55
+	env.ambient_light_energy = 0.22
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
 	env.tonemap_exposure = 1.35
 	env.glow_enabled = true
@@ -487,6 +505,28 @@ var entity_path_to := -1
 var bait_pos := Vector2(8, 7)
 var chase_t := 0.0
 var graze_cd := 0.0
+var has_key_exit := false
+var has_key_ch1 := false
+var key_exit_pos := Vector2(16.9, 3.4)
+var key_ch1_pos := Vector2(2.6, 7.4)
+var key_mesh_e: Node3D = null
+var key_mesh_c: Node3D = null
+var hidden := false
+var lock_cd := 0.0
+var ch1_locked := true
+var ch1_door_node: Node3D = null
+var ch1_col: StaticBody3D = null
+var glue_zones: Array = []
+var ent_glued := false
+var hide_cd := 0.0
+var dbg_had_key := false
+var dbg_stuck_t := 0.0
+var dbg_last_pos := Vector2.ZERO
+var dbg_jdir := 1.0
+const KEY_SPOTS_A := [Vector2(16.9, 3.4), Vector2(3.9, 3.4), Vector2(9.8, 8.9)]
+const KEY_SPOTS_B := [Vector2(2.6, 7.4), Vector2(11.2, 2.4), Vector2(17.9, 7.4)]
+const HIDE_SPOTS := [Vector2(8.0, 12.6), Vector2(15.8, 9.0), Vector2(5.9, 9.2)]
+const SPAWN_POINTS := [Vector2(1.2, 7.0), Vector2(2.0, 2.0), Vector2(11.5, 2.2)]
 var dbg_path: Array = []
 var shot_i := 0
 var shot_frames := 0
@@ -581,30 +621,40 @@ func _furn(sz: Vector3, at: Vector3, m: StandardMaterial3D, rot_y := 0.0) -> Mes
 	return b
 
 
-func _door_panel(at: Vector2, rot_y: float) -> void:
+func _door_panel(at: Vector2, side: float) -> void:
 	var wood := _pbr("door")
-	var b := _box(Vector3(0.95, 2.1, 0.07), wood)
-	var px := at.x + cos(rot_y) * 0.45
-	var pz := at.y - sin(rot_y) * 0.45
-	b.position = Vector3(px, 1.05, pz)
-	b.rotation = Vector3(0, rot_y, 0)
+	var b := _box(Vector3(0.9, 2.1, 0.07), wood)
+	var hinge := Vector2(at.x + side * 0.72, at.y)
+	var th := 1.52 * (1.0 if side > 0 else -1.0)
+	b.position = Vector3(hinge.x + cos(th) * 0.45, 1.05, hinge.y - sin(th) * 0.45)
+	b.rotation = Vector3(0, th, 0)
 	world.add_child(b)
 	var col := StaticBody3D.new()
-	var bs := BoxShape3D.new()
-	bs.size = Vector3(0.95, 2.1, 0.09)
 	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = Vector3(0.9, 2.1, 0.09)
 	cs.shape = bs
 	col.add_child(cs)
 	col.position = b.position
-	col.rotation = Vector3(0, rot_y, 0)
+	col.rotation = Vector3(0, th, 0)
 	world.add_child(col)
 	var fr := _simple(Color(0.13, 0.09, 0.06), 0.55)
 	for sd in [-1, 1]:
-		var j := _box(Vector3(0.10, 2.3, 0.10), fr)
-		j.position = Vector3(at.x + cos(rot_y) * 0.52 * sd, 1.15, at.y - sin(rot_y) * 0.52 * sd)
-		j.rotation = Vector3(0, rot_y, 0)
-		world.add_child(j)
-
+		var j2 := _box(Vector3(0.10, 2.3, 0.10), fr)
+		j2.position = Vector3(at.x + 0.78 * sd, 1.15, at.y)
+		world.add_child(j2)
+		var jc := StaticBody3D.new()
+		var jcs := CollisionShape3D.new()
+		var jbs := BoxShape3D.new()
+		jbs.size = Vector3(0.10, 2.3, 0.10)
+		jcs.shape = jbs
+		jc.add_child(jcs)
+		jc.position = j2.position
+		world.add_child(jc)
+	var poig := _simple(Color(0.35, 0.3, 0.2), 0.3, 0.8)
+	var pg := _box(Vector3(0.03, 0.12, 0.03), poig)
+	pg.position = Vector3(b.position.x - cos(th) * 0.38 * 0.9, 1.05, b.position.z + sin(th) * 0.38 * 0.9)
+	world.add_child(pg)
 
 func _build_house() -> void:
 	var fw := _pbr("floor")
@@ -629,19 +679,32 @@ func _build_house() -> void:
 	_wall_seg(0, 0, 20, 0)
 	_wall_seg(0, 14, 20, 14)
 	_wall_seg(0, 0, 0, 14)
-	_wall_seg(20, 0, 20, 6.4)
-	_wall_seg(20, 7.6, 20, 14)
-	# mur nord intérieur z=5.8 (3 portes)
-	_wall_seg(0, 5.8, 3, 5.8)
-	_wall_seg(4.1, 5.8, 9.5, 5.8)
-	_wall_seg(10.6, 5.8, 16, 5.8)
-	_wall_seg(17.1, 5.8, 20, 5.8)
-	# mur sud intérieur z=8.2 (4 portes)
-	_wall_seg(0, 8.2, 2.5, 8.2)
-	_wall_seg(3.6, 8.2, 7.5, 8.2)
-	_wall_seg(8.6, 8.2, 12, 8.2)
-	_wall_seg(13.1, 8.2, 17, 8.2)
-	_wall_seg(18.1, 8.2, 20, 8.2)
+	_wall_seg(20, 0, 20, 6.2)
+	_wall_seg(20, 7.8, 20, 14)
+	# mur nord intérieur z=5.8 (3 portes larges 1.6 m)
+	_wall_seg(0, 5.8, 2.75, 5.8)
+	_wall_seg(4.35, 5.8, 9.25, 5.8)
+	_wall_seg(10.85, 5.8, 15.75, 5.8)
+	_wall_seg(17.35, 5.8, 20, 5.8)
+	# mur sud intérieur z=8.2 (4 portes larges 1.6 m)
+	_wall_seg(0, 8.2, 2.25, 8.2)
+	_wall_seg(3.85, 8.2, 7.25, 8.2)
+	_wall_seg(8.85, 8.2, 11.75, 8.2)
+	_wall_seg(13.35, 8.2, 16.75, 8.2)
+	_wall_seg(18.35, 8.2, 20, 8.2)
+	# piliers de jonction : plus aucun trou aux raccords
+	for jp in [Vector2(0, 0), Vector2(20, 0), Vector2(0, 14), Vector2(20, 14), Vector2(0, 5.8), Vector2(20, 5.8), Vector2(0, 8.2), Vector2(20, 8.2), Vector2(7, 0), Vector2(13, 0), Vector2(7, 5.8), Vector2(13, 5.8), Vector2(6, 14), Vector2(10, 14), Vector2(15, 14), Vector2(6, 8.2), Vector2(10, 8.2), Vector2(15, 8.2)]:
+		var pil := _box(Vector3(0.42, WALL_H, 0.42), _pbr("wall"))
+		pil.position = Vector3(jp.x, WALL_H / 2.0, jp.y)
+		world.add_child(pil)
+		var pcol := StaticBody3D.new()
+		var pcs := CollisionShape3D.new()
+		var pbs := BoxShape3D.new()
+		pbs.size = Vector3(0.42, WALL_H, 0.42)
+		pcs.shape = pbs
+		pcol.add_child(pcs)
+		pcol.position = Vector3(jp.x, WALL_H / 2.0, jp.y)
+		world.add_child(pcol)
 	# cloisons
 	_wall_seg(7, 0, 7, 5.8)
 	_wall_seg(13, 0, 13, 5.8)
@@ -649,13 +712,27 @@ func _build_house() -> void:
 	_wall_seg(10, 8.2, 10, 14)
 	_wall_seg(15, 8.2, 15, 14)
 	# panneaux de porte entrebâillés (solides) dans chaque ouverture
-	_door_panel(Vector2(3.55, 5.8), 1.35)
-	_door_panel(Vector2(10.05, 5.8), -1.35)
-	_door_panel(Vector2(16.55, 5.8), 1.35)
-	_door_panel(Vector2(3.05, 8.2), -1.35)
-	_door_panel(Vector2(8.05, 8.2), 1.35)
-	_door_panel(Vector2(12.55, 8.2), -1.35)
-	_door_panel(Vector2(17.55, 8.2), 1.35)
+	_door_panel(Vector2(3.55, 5.8), 1.0)
+	_door_panel(Vector2(10.05, 5.8), -1.0)
+	_door_panel(Vector2(16.55, 5.8), 1.0)
+	_door_panel(Vector2(3.05, 8.2), -1.0)
+	_door_panel(Vector2(8.05, 8.2), 1.0)
+	var c1d := _box(Vector3(1.6, 2.1, 0.09), _pbr("door"))
+	c1d.position = Vector3(12.55, 1.05, 8.2)
+	world.add_child(c1d)
+	ch1_door_node = c1d
+	ch1_col = StaticBody3D.new()
+	var c1cs := CollisionShape3D.new()
+	var c1bs := BoxShape3D.new()
+	c1bs.size = Vector3(1.6, 2.1, 0.12)
+	c1cs.shape = c1bs
+	ch1_col.add_child(c1cs)
+	ch1_col.position = Vector3(12.55, 1.05, 8.2)
+	world.add_child(ch1_col)
+	var c1k := _box(Vector3(0.06, 0.06, 0.03), _simple(Color(0.5, 0.4, 0.15), 0.3, 0.9))
+	c1k.position = Vector3(13.1, 1.05, 8.27)
+	world.add_child(c1k)
+	_door_panel(Vector2(17.55, 8.2), 1.0)
 	# meubles salon
 	var woodm := _pbr("door")
 	var cloth := _simple(Color(0.25, 0.12, 0.10), 0.9)
@@ -690,8 +767,11 @@ func _build_house() -> void:
 	_furn(Vector3(2.0, 0.6, 1.6), Vector3(17.5, 0.3, 12.6), cloth)
 	_furn(Vector3(1.2, 0.75, 0.6), Vector3(19.2, 0.38, 9.3), woodm)
 	# lampes
+	var lit_ids := [1, 4, 7]
+	var li2 := 0
 	for lp in [Vector2(5, 7), Vector2(10, 7), Vector2(15, 7), Vector2(3.5, 3), Vector2(10, 3), Vector2(16.5, 3), Vector2(3, 11), Vector2(8, 11), Vector2(12.5, 11), Vector2(17.5, 11)]:
-		world.add_child(_make_lamp(Vector3(lp.x, 0, lp.y)))
+		world.add_child(_make_lamp(Vector3(lp.x, 0, lp.y), li2 in lit_ids))
+		li2 += 1
 	# porte de sortie (panneau fermé + panneau EXIT lumineux)
 	exit_door = Node3D.new()
 	exit_door.position = Vector3(exit_pos.x + 0.2, 0, exit_pos.y)
@@ -714,6 +794,45 @@ func _build_house() -> void:
 	exit_col.add_child(ecs)
 	exit_col.position = Vector3(20.0, WALL_H / 2.0, 7.0)
 	world.add_child(exit_col)
+	# cachettes : placard ch2, alcôve garage (sous escalier = renfoncement naturel)
+	var plankm := _pbr("wall")
+	for hp in [Vector2(15.8, 9.0), Vector2(5.9, 9.2)]:
+		for hd in [Vector3(-0.55, 0, 0), Vector3(0.55, 0, 0), Vector3(0, 0, -0.55)]:
+			var hw := _box(Vector3(0.08 if hd.x != 0 else 1.2, 2.0, 1.2 if hd.x != 0 else 0.08), plankm)
+			hw.position = Vector3(hp.x + hd.x, 1.0, hp.y + hd.z)
+			world.add_child(hw)
+		var ht := _box(Vector3(1.2, 0.08, 1.2), plankm)
+		ht.position = Vector3(hp.x, 2.0, hp.y)
+		world.add_child(ht)
+	# détails : tapis, cartons, toiles d'araignée, citrouilles
+	var rug1 := _quad(Vector2(2.6, 1.8), _simple(Color(0.22, 0.06, 0.06), 0.9))
+	rug1.rotation = Vector3(PI / 2, 0, 0.1)
+	rug1.position = Vector3(3.5, 0.02, 2.8)
+	world.add_child(rug1)
+	var rug2 := _quad(Vector2(1.8, 1.3), _simple(Color(0.10, 0.10, 0.16), 0.9))
+	rug2.rotation = Vector3(PI / 2, 0, 0)
+	rug2.position = Vector3(17.5, 0.02, 11.4)
+	world.add_child(rug2)
+	var cartm := _simple(Color(0.35, 0.26, 0.16), 0.8)
+	for bx in [Vector3(5.2, 0.25, 9.6), Vector3(5.7, 0.25, 10.3), Vector3(5.45, 0.72, 9.95)]:
+		var cb := _box(Vector3(0.5, 0.5, 0.5), cartm)
+		cb.position = bx
+		cb.rotation = Vector3(0, rng.randf() * 0.8, 0)
+		world.add_child(cb)
+	_furn(Vector3(0.5, 0.5, 0.5), Vector3(5.2, 0.25, 9.6), cartm)
+	_furn(Vector3(0.5, 0.5, 0.5), Vector3(5.7, 0.25, 10.3), cartm)
+	_furn(Vector3(0.5, 0.5, 0.5), Vector3(5.45, 0.72, 9.95), cartm)
+	for cw in [Vector3(0.4, 2.55, 0.4), Vector3(19.6, 2.55, 0.4), Vector3(0.4, 2.55, 13.6), Vector3(19.6, 2.55, 13.6)]:
+		var webm := _simple(Color(0.7, 0.7, 0.68), 0.9)
+		webm.transparency_mode = 1
+		webm.albedo_color = Color(0.7, 0.7, 0.68, 0.25)
+		var web := _quad(Vector2(0.7, 0.7), webm)
+		web.rotation = Vector3(PI / 2, 0, PI / 4)
+		web.position = cw
+		world.add_child(web)
+	dyn.add_child(_make_pumpkin(Vector3(4.8, 0, 1.8), 0.7))
+	dyn.add_child(_make_pumpkin(Vector3(11.2, 0, 9.2), 0.6))
+	dyn.add_child(_make_pumpkin(Vector3(18.2, 0, 10.8), 0.8))
 	# lattes fatiguées (zones qui grincent) : visibles au sol
 	var dark_plank := _simple(Color(0.10, 0.062, 0.04), 0.9)
 	for cz in CREEK_ZONES:
@@ -748,7 +867,7 @@ func _make_poster_xy(at: Vector2, ry: float) -> Node3D:
 	return nd
 
 
-func _make_lamp(at: Vector3) -> Node3D:
+func _make_lamp(at: Vector3, lit := true) -> Node3D:
 	var n := Node3D.new()
 	n.position = at
 	var cord := _box(Vector3(0.02, 0.4, 0.02), _simple(Color(0.05, 0.05, 0.05), 0.6))
@@ -779,7 +898,10 @@ func _make_lamp(at: Vector3) -> Node3D:
 	li.shadow_enabled = true
 	li.position = Vector3(0, 2.34, 0)
 	n.add_child(li)
-	lamps.append([li, bulb_mat, n])
+	lamps.append([li, bulb_mat, n, lit])
+	if not lit:
+		li.light_energy = 0.0
+		bulb_mat.emission_energy = 0.0
 	return n
 
 
@@ -868,15 +990,20 @@ func _make_entity() -> Node3D:
 	var black := StandardMaterial3D.new()
 	black.albedo_color = Color(0.0, 0.0, 0.0)
 	black.roughness = 0.15
-	for sx in [-0.13, 0.13]:
+	for si in range(2):
+		var sx := -0.13 if si == 0 else 0.13
+		var legp := Node3D.new()
+		legp.name = "LegL" if si == 0 else "LegR"
+		legp.position = Vector3(sx, 1.15, 0)
 		var leg := MeshInstance3D.new()
 		var lm := CapsuleMesh.new()
 		lm.radius = 0.05
 		lm.height = 1.2
 		leg.mesh = lm
 		leg.material_override = dark
-		leg.position = Vector3(sx, 0.6, 0)
-		nd.add_child(leg)
+		leg.position = Vector3(0, -0.6, 0)
+		legp.add_child(leg)
+		nd.add_child(legp)
 	var torso := MeshInstance3D.new()
 	var tm := CylinderMesh.new()
 	tm.top_radius = 0.36
@@ -914,6 +1041,32 @@ func _make_entity() -> Node3D:
 		fore.add_child(hand)
 		arm.add_child(fore)
 		nd.add_child(arm)
+	var spine := MeshInstance3D.new()
+	var spm := CylinderMesh.new()
+	spm.top_radius = 0.06
+	spm.bottom_radius = 0.10
+	spm.height = 0.75
+	spine.mesh = spm
+	spine.material_override = dark
+	spine.position = Vector3(0, 1.98, -0.14)
+	spine.rotation.x = 0.5
+	nd.add_child(spine)
+	for sxs in [-0.22, 0.22]:
+		var sh := MeshInstance3D.new()
+		var shm := CylinderMesh.new()
+		shm.top_radius = 0.02
+		shm.bottom_radius = 0.10
+		shm.height = 0.28
+		sh.mesh = shm
+		sh.material_override = dark
+		sh.position = Vector3(sxs, 2.02, -0.06)
+		sh.rotation.x = -0.5
+		nd.add_child(sh)
+	for st in range(3):
+		var rag := _quad(Vector2(0.13, 0.55), dark)
+		rag.position = Vector3(-0.16 + st * 0.16, 1.02, -0.13 - st * 0.03)
+		rag.rotation = Vector3(0.25, 0, 0.12 * (st - 1))
+		nd.add_child(rag)
 	var neck := MeshInstance3D.new()
 	var nm := CylinderMesh.new()
 	nm.top_radius = 0.045
@@ -1041,6 +1194,32 @@ func _draw_loop() -> void:
 	ma.cull_mode = StandardMaterial3D.CULL_DISABLED
 	ghost_arrow = _quad(Vector2(0.9, 0.9), ma)
 	dyn.add_child(ghost_arrow)
+	var gold := _emissive(Color(1.0, 0.8, 0.2), 2.2, "")
+	var krm := TorusMesh.new()
+	krm.inner_radius = 0.03
+	krm.outer_radius = 0.05
+	key_mesh_e = Node3D.new()
+	var kb1 := _box(Vector3(0.14, 0.03, 0.05), gold)
+	key_mesh_e.add_child(kb1)
+	var kr1 := MeshInstance3D.new()
+	kr1.mesh = krm
+	kr1.material_override = gold
+	kr1.position = Vector3(-0.09, 0, 0)
+	kr1.rotation = Vector3(PI / 2, 0, 0)
+	key_mesh_e.add_child(kr1)
+	key_mesh_e.position = Vector3(key_exit_pos.x, 0.14, key_exit_pos.y)
+	dyn.add_child(key_mesh_e)
+	key_mesh_c = Node3D.new()
+	var kb2 := _box(Vector3(0.14, 0.03, 0.05), gold)
+	key_mesh_c.add_child(kb2)
+	var kr2 := MeshInstance3D.new()
+	kr2.mesh = krm
+	kr2.material_override = gold
+	kr2.position = Vector3(-0.09, 0, 0)
+	kr2.rotation = Vector3(PI / 2, 0, 0)
+	key_mesh_c.add_child(kr2)
+	key_mesh_c.position = Vector3(key_ch1_pos.x, 0.14, key_ch1_pos.y)
+	dyn.add_child(key_mesh_c)
 
 
 func _apply_anomaly() -> void:
@@ -1083,6 +1262,8 @@ func _bfs_pts(a: int, b: int) -> Array:
 
 
 func _move_entity_toward(target2: Vector2, spd: float, d: float) -> void:
+	if ent_glued:
+		spd *= 0.4
 	var e2 := Vector2(entity.position.x, entity.position.z)
 	var en := _node_of(e2)
 	var tn := _node_of(target2)
@@ -1142,9 +1323,9 @@ func _build_player() -> void:
 	player.add_child(cam)
 	headlamp = SpotLight3D.new()
 	headlamp.light_color = Color(1.0, 0.86, 0.66)
-	headlamp.light_energy = 1.7
-	headlamp.spot_range = 10.0
-	headlamp.spot_angle = 58.0
+	headlamp.light_energy = 9.0
+	headlamp.spot_range = 18.0
+	headlamp.spot_angle = 50.0
 	headlamp.shadow_enabled = false
 	headlamp.position = Vector3(0, -0.05, 0)
 	cam.add_child(headlamp)
@@ -1172,77 +1353,14 @@ func _build_player() -> void:
 	dust.process_material = pm
 	dust.position = Vector3(0, 0, -2.2)
 	cam.add_child(dust)
-	hands = Node3D.new()
-	hands.position = Vector3(0, -0.34, -0.52)
-	cam.add_child(hands)
-	var sleeve := _simple(Color(0.12, 0.10, 0.14), 0.8)
-	var skin := _simple(Color(0.74, 0.57, 0.46), 0.55)
-	var nail := _simple(Color(0.86, 0.74, 0.68), 0.3)
-	for s2 in [-1, 1]:
-		var arm := _box(Vector3(0.075, 0.075, 0.30), sleeve)
-		arm.position = Vector3(s2 * 0.26, -0.07, 0.12)
-		arm.rotation = Vector3(-0.30, s2 * 0.16, 0)
-		hands.add_child(arm)
-		var cuff := _box(Vector3(0.088, 0.088, 0.045), sleeve)
-		cuff.position = Vector3(s2 * 0.25, -0.045, -0.02)
-		cuff.rotation = Vector3(-0.4, s2 * 0.15, 0)
-		hands.add_child(cuff)
-		var palm := _box(Vector3(0.066, 0.026, 0.088), skin)
-		palm.position = Vector3(s2 * 0.24, -0.032, -0.09)
-		palm.rotation = Vector3(-0.55, s2 * 0.12, 0)
-		hands.add_child(palm)
-		var lengths: Array = [0.030, 0.026, 0.020]
-		for f in range(4):
-			var bx: float = s2 * (0.214 + f * 0.0175)
-			var curl: float = -0.62 - f * 0.05
-			var px: float = bx
-			var py: float = -0.048
-			var pz: float = -0.132
-			for ph in range(3):
-				var seg := MeshInstance3D.new()
-				var cm := CapsuleMesh.new()
-				cm.radius = 0.0075 - ph * 0.0008
-				cm.height = lengths[ph]
-				seg.mesh = cm
-				seg.material_override = skin
-				seg.rotation = Vector3(curl, s2 * 0.08, 0)
-				seg.rotation_order = 1
-				var half: float = lengths[ph] / 2.0
-				var dz: float = -cos(curl) * half
-				var dy: float = sin(curl) * half
-				seg.position = Vector3(px, py + dy, pz + dz)
-				hands.add_child(seg)
-				px += 0.0
-				py += sin(curl) * lengths[ph] * 0.92
-				pz += -cos(curl) * lengths[ph] * 0.92
-				curl -= 0.34
-			var ng := _box(Vector3(0.010, 0.004, 0.012), nail)
-			ng.position = Vector3(px, py - 0.004, pz - 0.006)
-			ng.rotation = Vector3(curl + 0.4, 0, 0)
-			hands.add_child(ng)
-		var th1 := MeshInstance3D.new()
-		var tcm := CapsuleMesh.new()
-		tcm.radius = 0.009
-		tcm.height = 0.038
-		th1.mesh = tcm
-		th1.material_override = skin
-		th1.position = Vector3(s2 * 0.208, -0.038, -0.098)
-		th1.rotation = Vector3(-0.35, s2 * 0.6, s2 * 0.5)
-		hands.add_child(th1)
-		var th2 := MeshInstance3D.new()
-		var tcm2 := CapsuleMesh.new()
-		tcm2.radius = 0.008
-		tcm2.height = 0.032
-		th2.mesh = tcm2
-		th2.material_override = skin
-		th2.position = Vector3(s2 * 0.192, -0.052, -0.122)
-		th2.rotation = Vector3(-0.75, s2 * 0.5, s2 * 0.4)
-		hands.add_child(th2)
 	_respawn()
 
 
 func _respawn_at(p: Vector2) -> void:
 	player.position = Vector3(p.x, 0, p.y)
+	dbg_path = []
+	dbg_done_path = false
+	dbg_stuck_t = 0.0
 
 
 func _respawn() -> void:
@@ -1867,6 +1985,16 @@ func _begin_run() -> void:
 		entity.queue_free()
 		entity = null
 		entity = null
+	spawn_pos = SPAWN_POINTS[rng.randi_range(0, SPAWN_POINTS.size() - 1)]
+	has_key_exit = false
+	has_key_ch1 = false
+	ch1_locked = true
+	hidden = false
+	lock_cd = 0.0
+	glue_zones.clear()
+	key_exit_pos = KEY_SPOTS_A[rng.randi_range(0, KEY_SPOTS_A.size() - 1)]
+	key_ch1_pos = KEY_SPOTS_B[rng.randi_range(0, KEY_SPOTS_B.size() - 1)]
+	dbg_had_key = false
 	state = "play"
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	f_first_anom = false
@@ -2098,6 +2226,19 @@ func _unhandled_input(ev: InputEvent) -> void:
 				play("creak", -6.0, 1.3)
 				_toast(tt("candy_throw"), 3.0)
 				_toast(tt("candy_throw"), 3.0)
+			if ev.keycode == KEY_F and pocket > 0:
+				pocket -= 1
+				var gpos := Vector2(player.position.x, player.position.z) + Vector2(-sin(yaw), -cos(yaw)) * 2.0
+				var gmat := _simple(Color(0.9, 0.2, 0.55), 0.8)
+				gmat.transparency_mode = 1
+				gmat.albedo_color = Color(0.9, 0.2, 0.55, 0.22)
+				var gm := _quad(Vector2(3.2, 3.2), gmat)
+				gm.rotation = Vector3(PI / 2, 0, 0)
+				gm.position = Vector3(gpos.x, 0.03, gpos.y)
+				dyn.add_child(gm)
+				glue_zones.append([gpos, 8.0, gm])
+				play("step", -10.0, 0.5)
+				_toast(tt("glue_set"), 2.5)
 			if ev.keycode == KEY_V:
 				vhs.visible = not vhs.visible
 				vhs_visible_pref = vhs.visible
@@ -2184,11 +2325,26 @@ func _process(d: float) -> void:
 	var dat := "31 OCT 1997" if lang == "fr" else "OCT 31 1997"
 	var rec := "● " if fmod(run_time, 1.4) < 0.7 else "  "
 	ts_lbl.text = "%s%s %02d:%02d:%02d" % [rec, dat, (secs / 3600) % 24, (secs / 60) % 60, secs % 60]
+	if flicker_idx < 0 and rng.randf() < d * 0.06:
+		var lits := []
+		for k4 in range(lamps.size()):
+			if lamps[k4][3]:
+				lits.append(k4)
+		if lits.size():
+			flicker_idx = lits[rng.randi_range(0, lits.size() - 1)]
+			flicker_t = 1.2
 	if flicker_idx >= 0:
-		var lp = lamps[flicker_idx]
-		var on := fmod(run_time * 7.3, 1.0) > 0.25 and fmod(run_time * 3.1, 1.0) > 0.1
-		lp[0].visible = on
-		lp[1].emission_energy = 5.0 if on else 0.0
+		flicker_t -= d
+		if flicker_t <= 0.0:
+			lamps[flicker_idx][0].visible = true
+			lamps[flicker_idx][1].emission_energy = 5.0
+			flicker_idx = -1
+		else:
+			var lp = lamps[flicker_idx]
+			if lp[3]:
+				var on := fmod(run_time * 7.3, 1.0) > 0.25 and fmod(run_time * 3.1, 1.0) > 0.1
+				lp[0].visible = on
+				lp[1].emission_energy = 5.0 if on else 0.0
 	# déplacement
 	var fwd := Vector3(-sin(yaw), 0, -cos(yaw))
 	var rgt := Vector3(-fwd.z, 0, fwd.x)
@@ -2258,7 +2414,7 @@ func _process(d: float) -> void:
 		if creek_cd[zi] <= 0.0 and (Vector2(CREEK_ZONES[zi].x, CREEK_ZONES[zi].y) - p2z).length() < CREEK_ZONES[zi].z:
 			creek_cd[zi] = 3.0
 			play("creak", -8.0, 0.8)
-			noise = maxf(noise, 1.2)
+			noise = maxf(noise, 1.0)
 	for ci in range(CANDY_SPOTS.size()):
 		if not candy_taken[ci] and (CANDY_SPOTS[ci] - p2z).length() < 0.9:
 			candy_taken[ci] = true
@@ -2268,15 +2424,67 @@ func _process(d: float) -> void:
 			play("chime", -6.0)
 			_toast(tt("candy_pickup"), 3.0)
 			alert_t = maxf(alert_t, 1.5)
+	if key_mesh_e != null and is_instance_valid(key_mesh_e) and key_mesh_e.visible:
+		if p2z.distance_to(key_exit_pos) < 0.9:
+			has_key_exit = true
+			key_mesh_e.visible = false
+			play("chime", -5.0)
+			_toast(tt("key_pick_e"), 3.5)
+	if key_mesh_c != null and is_instance_valid(key_mesh_c) and key_mesh_c.visible:
+		if p2z.distance_to(key_ch1_pos) < 0.9:
+			has_key_ch1 = true
+			key_mesh_c.visible = false
+			play("chime", -5.0)
+			_toast(tt("key_pick_c"), 3.5)
 	var dexit: float = (exit_pos - p2z).length()
 	if dexit < 1.4:
-		_win()
-		return
+		if has_key_exit:
+			_win()
+			return
+		if lock_cd <= 0.0:
+			lock_cd = 2.5
+			_toast(tt("locked"), 3.0)
+			play("creak", -4.0, 0.6)
+	if ch1_locked and has_key_ch1:
+		var d1v := Vector2(player.position.x - 12.55, player.position.z - 8.2)
+		if d1v.length() < 1.3:
+			ch1_locked = false
+			if ch1_col != null and is_instance_valid(ch1_col):
+				ch1_col.queue_free()
+				ch1_col = null
+			if ch1_door_node != null and is_instance_valid(ch1_door_node):
+				ch1_door_node.queue_free()
+				ch1_door_node = null
+			_toast(tt("unlocked"), 3.0)
+			play("chime", -8.0)
+	hidden = false
+	for hs in HIDE_SPOTS:
+		if p2z.distance_to(hs) < 0.8:
+			hidden = true
+			if hide_cd <= 0.0:
+				hide_cd = 4.0
+				_toast(tt("hidden_t"), 3.0)
+	for gi in range(glue_zones.size() - 1, -1, -1):
+		glue_zones[gi][1] -= d
+		if glue_zones[gi][1] <= 0.0:
+			if is_instance_valid(glue_zones[gi][2]):
+				glue_zones[gi][2].queue_free()
+			glue_zones.remove_at(gi)
+	pocket_lbl.text = tt("pocket") % pocket + ("  ·  " + tt("key_e_s") if has_key_exit else "") + ("  ·  " + tt("key_c_s") if has_key_ch1 else "")
 	if entity == null or not is_instance_valid(entity):
 		_spawn_chaser()
 	var epos2 := Vector2(entity.position.x, entity.position.z)
 	var dist: float = (epos2 - p2z).length()
+	ent_glued = false
+	for gz in glue_zones:
+		if gz[1] > 0.0 and (gz[0] - epos2).length() < 1.6:
+			ent_glued = true
+	if hidden and entity_mode != 0:
+		entity_mode = 0
+		entity_target = _node_of(epos2)
 	var hear_r := noise * 14.0
+	if hidden:
+		hear_r = 0.0
 	if dbg == "smart" or dbg == "blind":
 		hear_r = 0.0
 	if bait_timer > 0.0:
@@ -2289,9 +2497,9 @@ func _process(d: float) -> void:
 		entity_stun -= d
 	elif entity_mode == 2:
 		chase_t += d
-		var spd := 4.3 if candies.get("reglisse", false) else 3.7
+		var spd := 4.3 if candies.get("reglisse", false) else 3.6
 		_move_entity_toward(p2z, spd, d)
-		if chase_t > 7.0 and noise < 0.35:
+		if chase_t > 6.0 and noise < 0.35:
 			entity_mode = 0
 			chase_t = 0.0
 			entity_target = _node_of(epos2)
@@ -2303,7 +2511,7 @@ func _process(d: float) -> void:
 			entity_mode = 1
 		alert_t = 4.0
 		entity_target_pos = p2z
-		_move_entity_toward(p2z, 3.7 if entity_mode == 2 else 2.2, d)
+		_move_entity_toward(p2z, 3.6 if entity_mode == 2 else 2.2, d)
 	else:
 		if entity_mode == 1:
 			_move_entity_toward(entity_target_pos, 2.2, d)
@@ -2337,7 +2545,9 @@ func _process(d: float) -> void:
 	dist = (epos2 - p2z).length()
 	entity.visible = true
 	graze_cd = maxf(0.0, graze_cd - d)
-	if dist < 0.85 and dbg != "smart" and graze_cd <= 0.0:
+	lock_cd = maxf(0.0, lock_cd - d)
+	hide_cd = maxf(0.0, hide_cd - d)
+	if dist < 0.85 and not hidden and dbg != "smart" and graze_cd <= 0.0:
 		if candies.get("caramel", false) and graze == 0:
 			graze = 1
 			entity_mode = 0
@@ -2387,12 +2597,18 @@ func _process(d: float) -> void:
 			if armn != null:
 				var sgn := -1.0 if an == "ArmL" else 1.0
 				var sw := sin(tt2 * 5.0 + (0.0 if sgn > 0 else PI)) * (0.45 if entity_mode == 2 else 0.15)
-				armn.rotation.x = (-1.15 if entity_mode == 2 else 0.0) + sw * 0.25 + sin(tt2 * 11.0) * 0.02
+				armn.rotation.x = (-1.15 if entity_mode == 2 else sin(ent_phase + (PI if sgn > 0 else 0.0)) * 0.3) + sw * 0.25 + sin(tt2 * 11.0) * 0.02
 				armn.rotation.z = sgn * ((0.75 if entity_mode == 2 else 0.10) + sin(tt2 * 6.1) * 0.05)
 				var foren := armn.get_node_or_null("Fore")
 				if foren != null:
 					foren.rotation.x = (-0.5 if entity_mode == 2 else -0.08) + sin(tt2 * 5.7 + sgn) * 0.08
 		entity.position.y = absf(sin(tt2 * 4.4)) * (0.055 if entity_mode == 2 else 0.012)
+		ent_phase += d * (6.5 if entity_mode == 2 else 2.2)
+		for ln2 in ["LegL", "LegR"]:
+			var legn := entity.get_node_or_null(ln2)
+			if legn != null:
+				legn.rotation.x = sin(ent_phase + (0.0 if ln2 == "LegL" else PI)) * (0.8 if entity_mode == 2 else 0.35)
+		entity.rotation.x = 0.14 if entity_mode == 2 else 0.04
 	if ghost_arrow != null and is_instance_valid(ghost_arrow):
 		ghost_arrow.visible = hud_on
 		var dirv := (exit_pos - p2z).normalized()
@@ -2486,31 +2702,47 @@ func _dbg_shot(d: float) -> void:
 
 
 func _dbg_walk(d: float) -> void:
-	if dbg_path.is_empty() and not dbg_done_path:
-		dbg_path = _bfs_pts(_node_of(spawn_pos), _node_of(exit_pos))
-		dbg_done_path = true
 	var p2 := Vector2(player.position.x, player.position.z)
-	var goal: Vector2 = exit_pos
+	var final_goal := exit_pos if has_key_exit else key_exit_pos
+	if has_key_exit != dbg_had_key:
+		dbg_had_key = has_key_exit
+		dbg_path = _bfs_pts(_node_of(p2), _node_of(final_goal))
+	if dbg_path.is_empty() and not dbg_done_path:
+		dbg_path = _bfs_pts(_node_of(spawn_pos), _node_of(final_goal))
+		dbg_done_path = true
+	var goal: Vector2 = final_goal
 	if dbg_path.size() > 0:
 		goal = dbg_path[0]
 		if (goal - p2).length() < 0.5:
 			dbg_path.pop_front()
-			goal = exit_pos if dbg_path.is_empty() else dbg_path[0]
+			goal = final_goal if dbg_path.is_empty() else dbg_path[0]
 	var spd := 3.4
 	noise = 1.0
 	if dbg == "smart":
 		spd = 3.6
 		noise = 0.05
 	if dbg == "quiet":
-		spd = 3.4
-		noise = 0.18
+		spd = 3.5
+		noise = 0.14
 	if dbg == "blind":
 		spd = 3.4
 	var dirv := goal - p2
 	if dirv.length() > 0.01:
 		dirv = dirv.normalized()
-		player.position = Vector3(p2.x + dirv.x * spd * d, 0, p2.y + dirv.y * spd * d)
 		yaw = atan2(-dirv.x, -dirv.y)
+	dbg_stuck_t += d
+	if (p2 - dbg_last_pos).length() > 0.3:
+		dbg_stuck_t = 0.0
+		dbg_jdir = 1.0 if rng.randf() < 0.5 else -1.0
+	dbg_last_pos = p2
+	if dbg_stuck_t > 1.2 and dirv.length() > 0.01:
+		var perp := Vector2(-dirv.y, dirv.x) * dbg_jdir
+		var nudge := 1.1 if dbg_stuck_t < 3.0 else 2.4
+		player.position = Vector3(p2.x + perp.x * nudge, 0, p2.y + perp.y * nudge)
+		dbg_stuck_t = 0.0
+		dbg_jdir = -dbg_jdir
+		p2 = Vector2(player.position.x, player.position.z)
+	player.position = Vector3(p2.x + dirv.x * spd * d, 0, p2.y + dirv.y * spd * d)
 	stamina = 1.0
 
 
@@ -2558,6 +2790,19 @@ func _dbg_audit(d: float) -> void:
 			if entity_mode != 1:
 				fail = "bait"
 			bait_timer = 0.0
+			var door_pts := [[Vector3(3.55, 0, 6.8), Vector3(0, 0, -1)], [Vector3(10.05, 0, 6.8), Vector3(0, 0, -1)], [Vector3(16.55, 0, 6.8), Vector3(0, 0, -1)], [Vector3(3.05, 0, 7.2), Vector3(0, 0, 1)], [Vector3(8.05, 0, 7.2), Vector3(0, 0, 1)], [Vector3(17.55, 0, 7.2), Vector3(0, 0, 1)]]
+			for dp in door_pts:
+				player.global_position = dp[0]
+				var crossed := false
+				for k5 in range(70):
+					player.velocity = dp[1] * 3.4
+					player.move_and_slide()
+					if dp[1].dot(player.global_position - dp[0]) > 0.9:
+						crossed = true
+				if not crossed:
+					fail = "doors"
+					print("DOOR BLOCKED ", dp[0])
+			has_key_exit = true
 			player.position = Vector3(exit_pos.x - 0.8, 0, exit_pos.y)
 		6:
 			if state != "win":
