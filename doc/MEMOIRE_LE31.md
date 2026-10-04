@@ -2,6 +2,10 @@
 _Ce fichier est LA source de vérité du projet « LE 31 » (jeu d'horreur Halloween, Godot 4.3).
 Le projet « Marmite & Monstres » est ABANDONNÉ par l'utilisateur : ne JAMAIS le relancer, ne jamais en parler, ne jamais toucher aux dossiers marmite/ s'ils existent encore._
 
+## 0. Miroir public (si workspace vide et sans token)
+- Mémoire toujours lisible sans auth : https://raw.githubusercontent.com/articro/le-31-memoire/main/MEMOIRE_LE31.md (et START_LE31.md dans le même repo public articro/le-31-memoire).
+- Le repo du JEU (articro/le-31) reste PRIVÉ : pour télécharger le zip v10 ou pusher, il faut un PAT que l'utilisateur colle en session.
+
 ## 1. Cadre & utilisateur
 - Jeu horreur « LE 31 » : sortie avant le 31 oct 2026, lancement dans Godot (F5), PAS itch.io, zéro budget, « un jeu beau graphiquement ».
 - Répondre en français, décisions directes, prendre des initiatives sans demander (l'utilisateur a déjà skipé un questionnaire : préférer trancher justifié).
