@@ -25,6 +25,9 @@
   **F** = poser un piège de **sucre collant** : elle y reste engluée et ralentie (~8 s).
 - **3 CACHETTES** où elle ne peut rien contre toi : placard de la chambre 2, alcôve du garage,
   renfoncement de l'escalier. Dedans, elle t'oublie — mais ne reste pas toute la nuit.
+- **L'ÉTAGE** : l'escalier du garage (ouest) monte à un étage sombre (2 zones : grenier
+  aménagé à l'ouest, chambre à l'est). Elle entend mal à travers le plancher — mais elle
+  monte très bien quand elle te traque. Clé, bonbon et cachette peuvent s'y trouver.
 - **3 points d'apparition** aléatoires au départ et après chaque prise.
 - Certaines zones de plancher **grincent**. Si elle te touche : jumpscare, tu te réveilles
   à l'entrée. **3 prises = game over.** Sors vivant.

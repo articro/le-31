@@ -51,8 +51,8 @@ const TR := {
 		"how_title": "COMMENT JOUER",
 		"how_1": "1. La maison est SOMBRE : ta lampe torche (G) est ta meilleure amie. La sortie est à l'EST — mais elle est VERROUILLÉE : trouve la clé dorée (position différente à chaque partie).",
 		"how_2": "2. ELLE est aveugle mais entend tes pas, et elle MARCHE et COURT comme une bête. Courir = du bruit = elle te traque. Le plancher grince par endroits.",
-		"how_3": "3. Bonbons (4) : E = diversion, F = piège de sucre collant qui la ralentit. Une 2e clé ouvre la chambre verrouillée (bonbon + placard à l'intérieur).",
-		"how_4": "4. 3 CACHETTES où elle ne peut rien : placards (chambre, garage) et le renfoncement sous l'escalier. Dedans, elle t'oublie — mais ne reste pas toute la nuit.",
+		"how_3": "3. Bonbons (5) : E = diversion, F = piège de sucre collant qui la ralentit. Une 2e clé ouvre la chambre verrouillée (bonbon + placard à l'intérieur).",
+		"how_4": "4. 4 CACHETTES où elle ne peut rien : placards (chambres, garage) et renfoncement de l'escalier. L'escalier raide du garage monte à l'ÉTAGE : une pièce de plus à fouiller — elle entend mal à travers le plancher.",
 		"how_5": "5. Si elle te touche : tu te réveilles à l'entrée (3 points d'apparition aléatoires). 3 prises = c'est fini. Sors vivant.",
 		"obj_banner": "BUT : traverse si rien n'a changé · demi-tour si changé · 5 tours = sortie",
 		"hint_move": "ZQSD / WASD + SOURIS pour regarder · MAJ pour courir",
@@ -152,8 +152,8 @@ const TR := {
 		"how_title": "HOW TO PLAY",
 		"how_1": "1. The house is DARK: your flashlight (G) is your best friend. The exit is EAST — but it's LOCKED: find the golden key (new spot every run).",
 		"how_2": "2. SHE is blind but hears your steps, and she WALKS and RUNS like a beast. Sprint = noise = she hunts you. Some floorboards creak.",
-		"how_3": "3. Candies (4): E = decoy, F = sticky sugar trap that slows her down. A 2nd key opens the locked bedroom (candy + wardrobe inside).",
-		"how_4": "4. 3 HIDING SPOTS where she can't reach you: wardrobes (bedroom, garage) and the nook under the stairs. Inside, she forgets you — but don't stay all night.",
+		"how_3": "3. Candies (5): E = decoy, F = sticky sugar trap that slows her down. A 2nd key opens the locked bedroom (candy + wardrobe inside).",
+		"how_4": "4. 4 HIDING SPOTS where she can't reach you: wardrobes (bedrooms, garage) and the stair nook. The steep garage stairs climb to the UPSTAIRS: one more room to search — she hears you badly through the floor.",
 		"how_5": "5. If she touches you: you wake at the entrance (3 random spawn points). 3 catches = game over. Get out alive.",
 		"obj_banner": "GOAL: walk through if nothing changed · turn back if something did · 5 laps = exit",
 		"hint_move": "WASD / ZQSD + MOUSE to look · SHIFT to run",
@@ -489,12 +489,15 @@ const WALL_H := 2.9
 const WALL_T := 0.3
 var spawn_pos := Vector2(1.2, 7.0)
 var exit_pos := Vector2(19.7, 7.0)
-const NODES := [Vector2(2, 7), Vector2(10, 7), Vector2(17.5, 7), Vector2(3.5, 3), Vector2(10, 2.8), Vector2(16.5, 3), Vector2(3, 11), Vector2(8, 11), Vector2(12.5, 11), Vector2(17.5, 11)]
-const EDGES := [[0, 1], [1, 2], [0, 3], [1, 4], [2, 5], [0, 6], [1, 7], [1, 8], [2, 9]]
-const CANDY_SPOTS := [Vector2(9.5, 3.5), Vector2(2.2, 1.2), Vector2(14, 13), Vector2(1.2, 12.5)]
+const NODES := [Vector2(2, 7), Vector2(10, 7), Vector2(17.5, 7), Vector2(3.5, 3), Vector2(10, 2.8), Vector2(16.5, 3), Vector2(4.5, 9.3), Vector2(8, 11), Vector2(12.5, 11), Vector2(17.5, 11), Vector2(1.5, 7.6), Vector2(9.0, 5.0), Vector2(16.0, 7.0), Vector2(1.5, 13.2)]
+const EDGES := [[0, 1], [1, 2], [0, 3], [1, 4], [2, 5], [0, 6], [1, 7], [1, 8], [2, 9], [6, 13], [13, 10], [10, 11], [10, 12]]
+const NODE_LVL := [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0]
+const LEVEL_Y := [0.0, 2.98]
+const RAMP_RECT := [Vector2(0.9, 8.5), Vector2(2.1, 13.7)]
+const CANDY_SPOTS := [Vector3(9.5, 0, 3.5), Vector3(2.2, 0, 1.2), Vector3(14, 0, 13), Vector3(1.2, 0, 12.5), Vector3(16.2, 2.98, 11.5)]
 const CREEK_ZONES := [Vector3(5.5, 6.1, 0.6), Vector3(12.0, 7.9, 0.6), Vector3(10.3, 4.4, 0.6), Vector3(2.6, 2.2, 0.6), Vector3(13.4, 12.2, 0.6)]
 var creek_cd := [0.0, 0.0, 0.0, 0.0, 0.0]
-var candy_taken := [false, false, false, false]
+var candy_taken := [false, false, false, false, false]
 var candy_meshes: Array = []
 var entity_node := 6
 var entity_target := 6
@@ -508,7 +511,11 @@ var graze_cd := 0.0
 var has_key_exit := false
 var has_key_ch1 := false
 var key_exit_pos := Vector2(16.9, 3.4)
+var key_exit_lvl := 0
+var key_exit_y := 0.0
 var key_ch1_pos := Vector2(2.6, 7.4)
+var key_ch1_lvl := 0
+var key_ch1_y := 0.0
 var key_mesh_e: Node3D = null
 var key_mesh_c: Node3D = null
 var hidden := false
@@ -520,12 +527,21 @@ var glue_zones: Array = []
 var ent_glued := false
 var hide_cd := 0.0
 var dbg_had_key := false
+var player_level := 0
+var ent_level := 0
+var entity_target_lvl := 0
+var bait_level := 0
+var bot_level := 0
 var dbg_stuck_t := 0.0
+var dbg_move_frames := 0
+var stair_t := -1.0
+var stair_dir := 1
+var dbg_move_dir := Vector2.ZERO
 var dbg_last_pos := Vector2.ZERO
 var dbg_jdir := 1.0
-const KEY_SPOTS_A := [Vector2(16.9, 3.4), Vector2(3.9, 3.4), Vector2(9.8, 8.9)]
-const KEY_SPOTS_B := [Vector2(2.6, 7.4), Vector2(11.2, 2.4), Vector2(17.9, 7.4)]
-const HIDE_SPOTS := [Vector2(8.0, 12.6), Vector2(15.8, 9.0), Vector2(5.9, 9.2)]
+const KEY_SPOTS_A := [Vector3(16.9, 0, 3.4), Vector3(3.9, 0, 3.4), Vector3(9.8, 0, 8.9), Vector3(15.8, 2.98, 3.0)]
+const KEY_SPOTS_B := [Vector3(2.6, 0, 7.4), Vector3(11.2, 0, 2.4), Vector3(17.9, 0, 7.4), Vector3(6.5, 2.98, 2.5)]
+const HIDE_SPOTS := [Vector3(8.0, 0, 12.6), Vector3(15.8, 0, 9.0), Vector3(3.0, 0, 9.0), Vector3(18.8, 2.98, 2.2)]
 const SPAWN_POINTS := [Vector2(1.2, 7.0), Vector2(2.0, 2.0), Vector2(11.5, 2.2)]
 var dbg_path: Array = []
 var shot_i := 0
@@ -533,15 +549,26 @@ var shot_frames := 0
 var dbg_done_path := false
 
 
-func _node_of(p: Vector2) -> int:
+func _node_of(p: Vector2, lvl := -1) -> int:
 	var best := 0
 	var bd := 1e9
 	for i in range(NODES.size()):
+		if lvl >= 0 and NODE_LVL[i] != lvl:
+			continue
 		var dd: float = (NODES[i] - p).length()
 		if dd < bd:
 			bd = dd
 			best = i
+	if lvl >= 0 and NODE_LVL[best] != lvl:
+		best = 10 if lvl == 1 else 1
 	return best
+
+
+func _terrain_y(p: Vector2, lvl: int) -> float:
+	if p.x >= RAMP_RECT[0].x and p.x <= RAMP_RECT[1].x and p.y >= RAMP_RECT[0].y and p.y <= RAMP_RECT[1].y:
+		var idx := int(floor((13.7 - p.y) / 0.2146))
+		return clampf(idx * 0.124, 0.0, 2.98)
+	return LEVEL_Y[lvl]
 
 
 func _bfs_path(a: int, b: int) -> Array:
@@ -604,10 +631,10 @@ func _room_floor(x1: float, z1: float, x2: float, z2: float, mat: StandardMateri
 	world.add_child(q)
 
 
-func _furn(sz: Vector3, at: Vector3, m: StandardMaterial3D, rot_y := 0.0) -> MeshInstance3D:
+func _furn(sz: Vector3, at: Vector3, m: StandardMaterial3D, rot_y := 0.0, rot_x := 0.0) -> MeshInstance3D:
 	var b := _box(sz, m)
 	b.position = at
-	b.rotation = Vector3(0, rot_y, 0)
+	b.rotation = Vector3(rot_x, rot_y, 0)
 	world.add_child(b)
 	var col := StaticBody3D.new()
 	var bs := BoxShape3D.new()
@@ -616,7 +643,7 @@ func _furn(sz: Vector3, at: Vector3, m: StandardMaterial3D, rot_y := 0.0) -> Mes
 	cs.shape = bs
 	col.add_child(cs)
 	col.position = at
-	col.rotation = Vector3(0, rot_y, 0)
+	col.rotation = Vector3(rot_x, rot_y, 0)
 	world.add_child(col)
 	return b
 
@@ -748,17 +775,111 @@ func _build_house() -> void:
 	_furn(Vector3(0.6, 0.8, 0.5), Vector3(14.0, 0.4, 0.55), _simple(Color(0.85, 0.85, 0.88), 0.15))
 	_furn(Vector3(0.5, 0.75, 0.55), Vector3(16.2, 0.38, 0.5), _simple(Color(0.8, 0.8, 0.82), 0.2))
 	# garage : voiture + étagère
-	_furn(Vector3(4.2, 1.1, 2.0), Vector3(3.2, 0.65, 11.6), _simple(Color(0.16, 0.035, 0.03), 0.35, 0.5))
-	_furn(Vector3(2.3, 0.65, 1.7), Vector3(3.0, 1.5, 11.6), _simple(Color(0.14, 0.03, 0.028), 0.3, 0.5))
-	_furn(Vector3(2.1, 0.5, 1.6), Vector3(3.05, 1.42, 11.6), _simple(Color(0.02, 0.02, 0.025), 0.1, 0.1))
+	_furn(Vector3(4.2, 1.1, 2.0), Vector3(4.25, 0.65, 11.6), _simple(Color(0.16, 0.035, 0.03), 0.35, 0.5))
+	_furn(Vector3(2.3, 0.65, 1.7), Vector3(4.0, 1.5, 11.6), _simple(Color(0.14, 0.03, 0.028), 0.3, 0.5))
+	_furn(Vector3(2.1, 0.5, 1.6), Vector3(4.05, 1.42, 11.6), _simple(Color(0.02, 0.02, 0.025), 0.1, 0.1))
 	for wz in [10.3, 12.9]:
-		for wx in [1.5, 4.9]:
+		for wx in [2.9, 5.5]:
 			_furn(Vector3(0.7, 0.7, 0.25), Vector3(wx, 0.35, wz), _simple(Color(0.05, 0.05, 0.05), 0.8))
-	_furn(Vector3(0.5, 2.0, 3.4), Vector3(0.5, 1.0, 11.5), woodm)
-	# escalier + grenier condamné
-	for st in range(8):
-		_furn(Vector3(3.0, 0.25, 0.35), Vector3(8.0, 0.125 + st * 0.25, 13.3 - st * 0.35), woodm)
-	_furn(Vector3(3.0, 0.9, 0.12), Vector3(8.0, 1.6, 10.6), woodm, 0.5)
+	_furn(Vector3(0.5, 2.0, 3.4), Vector3(6.0, 1.0, 11.5), woodm)
+	# escalier du garage -> ÉTAGE (rampe physique + marches déco)
+	var ramp_len := sqrt(5.15 * 5.15 + 2.98 * 2.98)
+	var ramp_ang := atan2(2.98, 5.15)
+	var ramp := _box(Vector3(1.2, 0.16, ramp_len), woodm)
+	ramp.position = Vector3(1.5, 1.49, 11.12)
+	ramp.rotation = Vector3(ramp_ang, 0, 0)
+	world.add_child(ramp)
+	for st in range(24):
+		var scz := 13.6 - st * 0.2146
+		var scy := (st + 1) * 0.124 - 0.062
+		_furn(Vector3(1.2, 0.124, 0.26), Vector3(1.5, scy, scz), woodm)
+	for rx in [0.92, 2.08]:
+		var rail := _box(Vector3(0.06, 0.5, ramp_len), woodm)
+		rail.position = Vector3(rx, 1.49 + 0.42, 11.12)
+		rail.rotation = Vector3(ramp_ang, 0, 0)
+		world.add_child(rail)
+	# dalle de l'étage (trémie au-dessus de la rampe) + murs hauts + toit
+	var slabm := _pbr("ceil")
+	for sp in [Vector3(0.4, 2.9, 7.0), Vector3(11.1, 2.9, 7.0), Vector3(1.5, 2.9, 4.15), Vector3(1.5, 2.9, 11.6)]:
+		var sw := 0.8 if sp.x < 1 else (17.8 if sp.x > 10 else 1.4)
+		var sd2 := 14.0 if sp.z == 7.0 else (8.3 if sp.z < 7 else 4.8)
+		var sl := _box(Vector3(sw, 0.16, sd2), slabm)
+		sl.position = Vector3(sp.x, sp.y, sp.z)
+		world.add_child(sl)
+		_furn(Vector3(sw, 0.16, sd2), sp, slabm)
+	var upw := _pbr("wall")
+	for uw in [Vector3(20.0, 2.22, 0.3), Vector3(20.0, 2.22, 0.3), Vector3(0.3, 2.22, 14.0), Vector3(0.3, 2.22, 14.0)]:
+		pass
+	var uw1 := _box(Vector3(20.6, 2.22, 0.3), upw)
+	uw1.position = Vector3(10.0, 4.09, 0.0)
+	world.add_child(uw1)
+	_furn(Vector3(20.6, 2.22, 0.3), Vector3(10.0, 4.09, 0.0), upw)
+	var uw2 := _box(Vector3(20.6, 2.22, 0.3), upw)
+	uw2.position = Vector3(10.0, 4.09, 14.0)
+	world.add_child(uw2)
+	_furn(Vector3(20.6, 2.22, 0.3), Vector3(10.0, 4.09, 14.0), upw)
+	var uw3 := _box(Vector3(0.3, 2.22, 14.6), upw)
+	uw3.position = Vector3(0.0, 4.09, 7.0)
+	world.add_child(uw3)
+	_furn(Vector3(0.3, 2.22, 14.6), Vector3(0.0, 4.09, 7.0), upw)
+	var uw4 := _box(Vector3(0.3, 2.22, 14.6), upw)
+	uw4.position = Vector3(20.0, 4.09, 7.0)
+	world.add_child(uw4)
+	_furn(Vector3(0.3, 2.22, 14.6), Vector3(20.0, 4.09, 7.0), upw)
+	var roof := _box(Vector3(20.6, 0.2, 14.6), _pbr("ceil"))
+	roof.position = Vector3(10.0, 5.3, 7.0)
+	world.add_child(roof)
+	# cloison de l'étage (porte au centre) + linteau
+	var pw1 := _box(Vector3(0.2, 2.22, 5.9), upw)
+	pw1.position = Vector3(12.5, 4.09, 3.25)
+	world.add_child(pw1)
+	_furn(Vector3(0.2, 2.22, 5.9), Vector3(12.5, 4.09, 3.25), upw)
+	var pw2 := _box(Vector3(0.2, 2.22, 5.9), upw)
+	pw2.position = Vector3(12.5, 4.09, 10.75)
+	world.add_child(pw2)
+	_furn(Vector3(0.2, 2.22, 5.9), Vector3(12.5, 4.09, 10.75), upw)
+	var pw3 := _box(Vector3(0.2, 0.4, 1.6), upw)
+	pw3.position = Vector3(12.5, 5.0, 7.0)
+	world.add_child(pw3)
+	_furn(Vector3(0.2, 0.4, 1.6), Vector3(12.5, 5.0, 7.0), upw)
+	# props étage : matelas, cartons, lit, tapis, fenêtre lumineuse
+	_furn(Vector3(2.2, 0.3, 1.6), Vector3(8.5, 3.13, 3.1), cloth)
+	for ub in [Vector3(2.2, 3.2, 12.6), Vector3(2.7, 3.2, 13.1), Vector3(2.45, 3.65, 12.85)]:
+		_furn(Vector3(0.5, 0.5, 0.5), ub, _simple(Color(0.35, 0.26, 0.16), 0.8))
+	_furn(Vector3(2.0, 0.6, 1.6), Vector3(17.5, 3.28, 12.6), cloth)
+	var urug := _quad(Vector2(2.2, 1.6), _simple(Color(0.12, 0.08, 0.14), 0.9))
+	urug.rotation = Vector3(PI / 2, 0, 0)
+	urug.position = Vector3(16.0, 3.0, 7.0)
+	world.add_child(urug)
+	var uwin := _quad(Vector2(1.4, 1.0), _emissive(Color(0.35, 0.42, 0.6), 1.1, ""))
+	uwin.position = Vector3(8.0, 4.2, 0.16)
+	world.add_child(uwin)
+	# lampes de l'étage (une allumée, une morte) + placard-cachette haut
+	for ul in [Vector2(8.0, 7.0), Vector2(16.0, 7.0)]:
+		var uli := OmniLight3D.new()
+		uli.light_color = Color(1.0, 0.8, 0.55)
+		uli.light_energy = 5.0 if ul.x < 10 else 0.0
+		uli.omni_range = 8.0
+		uli.position = Vector3(ul.x, 4.6, ul.y)
+		uli.shadow_enabled = false
+		world.add_child(uli)
+		var ubm := _emissive(Color(1.0, 0.9, 0.7), 4.0 if ul.x < 10 else 0.0, "")
+		var ubu := MeshInstance3D.new()
+		var usm := SphereMesh.new()
+		usm.radius = 0.07
+		usm.height = 0.14
+		ubu.mesh = usm
+		ubu.material_override = ubm
+		ubu.position = Vector3(ul.x, 4.6, ul.y)
+		world.add_child(ubu)
+		lamps.append([uli, ubm, ubu, ul.x < 10])
+	for hd in [Vector3(-0.55, 0, 0), Vector3(0.55, 0, 0), Vector3(0, 0, -0.55)]:
+		var hw := _box(Vector3(0.08 if hd.x != 0 else 1.2, 2.0, 1.2 if hd.x != 0 else 0.08), _pbr("wall"))
+		hw.position = Vector3(18.8 + hd.x, 3.98, 2.2 + hd.z)
+		world.add_child(hw)
+	var uht := _box(Vector3(1.2, 0.08, 1.2), _pbr("wall"))
+	uht.position = Vector3(18.8, 4.98, 2.2)
+	world.add_child(uht)
 	# chambre 1
 	_furn(Vector3(2.0, 0.6, 1.6), Vector3(12.5, 0.3, 12.6), cloth)
 	_furn(Vector3(0.6, 2.0, 1.2), Vector3(10.5, 1.0, 10.0), woodm)
@@ -796,7 +917,7 @@ func _build_house() -> void:
 	world.add_child(exit_col)
 	# cachettes : placard ch2, alcôve garage (sous escalier = renfoncement naturel)
 	var plankm := _pbr("wall")
-	for hp in [Vector2(15.8, 9.0), Vector2(5.9, 9.2)]:
+	for hp in [Vector2(15.8, 9.0), Vector2(3.0, 9.0)]:
 		for hd in [Vector3(-0.55, 0, 0), Vector3(0.55, 0, 0), Vector3(0, 0, -0.55)]:
 			var hw := _box(Vector3(0.08 if hd.x != 0 else 1.2, 2.0, 1.2 if hd.x != 0 else 0.08), plankm)
 			hw.position = Vector3(hp.x + hd.x, 1.0, hp.y + hd.z)
@@ -845,7 +966,7 @@ func _build_house() -> void:
 	candy_meshes.clear()
 	for ci in range(CANDY_SPOTS.size()):
 		var cm := _box(Vector3(0.12, 0.09, 0.12), _emissive(Color(0.9, 0.3, 0.5), 1.6, ""))
-		cm.position = Vector3(CANDY_SPOTS[ci].x, 0.95, CANDY_SPOTS[ci].y)
+		cm.position = Vector3(CANDY_SPOTS[ci].x, CANDY_SPOTS[ci].y + 0.95, CANDY_SPOTS[ci].z)
 		world.add_child(cm)
 		candy_meshes.append(cm)
 	# affiches
@@ -1207,7 +1328,7 @@ func _draw_loop() -> void:
 	kr1.position = Vector3(-0.09, 0, 0)
 	kr1.rotation = Vector3(PI / 2, 0, 0)
 	key_mesh_e.add_child(kr1)
-	key_mesh_e.position = Vector3(key_exit_pos.x, 0.14, key_exit_pos.y)
+	key_mesh_e.position = Vector3(key_exit_pos.x, key_exit_y + 0.14, key_exit_pos.y)
 	dyn.add_child(key_mesh_e)
 	key_mesh_c = Node3D.new()
 	var kb2 := _box(Vector3(0.14, 0.03, 0.05), gold)
@@ -1218,7 +1339,7 @@ func _draw_loop() -> void:
 	kr2.position = Vector3(-0.09, 0, 0)
 	kr2.rotation = Vector3(PI / 2, 0, 0)
 	key_mesh_c.add_child(kr2)
-	key_mesh_c.position = Vector3(key_ch1_pos.x, 0.14, key_ch1_pos.y)
+	key_mesh_c.position = Vector3(key_ch1_pos.x, key_ch1_y + 0.14, key_ch1_pos.y)
 	dyn.add_child(key_mesh_c)
 
 
@@ -1261,12 +1382,13 @@ func _bfs_pts(a: int, b: int) -> Array:
 	return pts
 
 
-func _move_entity_toward(target2: Vector2, spd: float, d: float) -> void:
+func _move_entity_toward(target2: Vector2, spd: float, d: float, tlvl := -1) -> void:
 	if ent_glued:
 		spd *= 0.4
 	var e2 := Vector2(entity.position.x, entity.position.z)
-	var en := _node_of(e2)
-	var tn := _node_of(target2)
+	var en := _node_of(e2, ent_level)
+	var tn := _node_of(target2, tlvl if tlvl >= 0 else ent_level)
+	ent_level = NODE_LVL[tn]
 	var goal := target2
 	if en != tn:
 		if entity_path.is_empty() or entity_path_from != en or entity_path_to != tn:
@@ -1296,7 +1418,7 @@ func _spawn_chaser() -> void:
 	var p2 := Vector2(player.position.x, player.position.z)
 	var opts := []
 	for i3 in range(3, NODES.size()):
-		if (NODES[i3] - p2).length() > 7.0 and (NODES[i3] - exit_pos).length() > 4.0:
+		if NODE_LVL[i3] == 0 and (NODES[i3] - p2).length() > 7.0 and (NODES[i3] - exit_pos).length() > 4.0:
 			opts.append(i3)
 	if opts.is_empty():
 		opts = [6]
@@ -1992,8 +2114,16 @@ func _begin_run() -> void:
 	hidden = false
 	lock_cd = 0.0
 	glue_zones.clear()
-	key_exit_pos = KEY_SPOTS_A[rng.randi_range(0, KEY_SPOTS_A.size() - 1)]
-	key_ch1_pos = KEY_SPOTS_B[rng.randi_range(0, KEY_SPOTS_B.size() - 1)]
+	var ka: Vector3 = KEY_SPOTS_A[rng.randi_range(0, KEY_SPOTS_A.size() - 1)]
+	key_exit_pos = Vector2(ka.x, ka.z)
+	key_exit_lvl = 1 if ka.y > 1.0 else 0
+	key_exit_y = ka.y
+	var kb: Vector3 = KEY_SPOTS_B[rng.randi_range(0, KEY_SPOTS_B.size() - 1)]
+	key_ch1_pos = Vector2(kb.x, kb.z)
+	key_ch1_lvl = 1 if kb.y > 1.0 else 0
+	key_ch1_y = kb.y
+	bot_level = 0
+	ent_level = 0
 	dbg_had_key = false
 	state = "play"
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -2005,7 +2135,7 @@ func _begin_run() -> void:
 	noise = 0.0
 	bait_timer = 0.0
 	graze_cd = 0.0
-	candy_taken = [false, false, false, false]
+	candy_taken = [false, false, false, false, false]
 	creek_cd = [0.0, 0.0, 0.0, 0.0, 0.0]
 	entity_mode = 0
 	chase_t = 0.0
@@ -2223,6 +2353,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 				pocket -= 1
 				bait_pos = Vector2(player.position.x, player.position.z) + Vector2(-sin(yaw), -cos(yaw)) * 2.5
 				bait_timer = 4.0
+				bait_level = player_level
 				play("creak", -6.0, 1.3)
 				_toast(tt("candy_throw"), 3.0)
 				_toast(tt("candy_throw"), 3.0)
@@ -2362,6 +2493,9 @@ func _process(d: float) -> void:
 	if Input.is_key_pressed(KEY_RIGHT):
 		yaw -= 1.8 * d
 	var want_sprint := Input.is_key_pressed(KEY_SHIFT) and stamina > 0.05
+	if dbg_move_frames > 0:
+		mv = Vector3(dbg_move_dir.x, 0, dbg_move_dir.y)
+		dbg_move_frames -= 1
 	if mv.length_squared() > 0.01:
 		if want_sprint:
 			stamina = maxf(0.0, stamina - d * (0.11 if candies.get("sucre", false) else 0.22))
@@ -2378,7 +2512,31 @@ func _process(d: float) -> void:
 		bob = move_toward(bob, round(bob / TAU) * TAU, d * 4)
 		stamina = minf(1.0, stamina + d * 0.22)
 	player.rotation = Vector3(0, yaw, 0)
-	player.move_and_slide()
+	var skip_move := false
+	var pp2 := Vector2(player.position.x, player.position.z)
+	if stair_t < 0.0:
+		if pp2.x > 0.9 and pp2.x < 2.1 and pp2.y > 13.1 and pp2.y < 13.85 and mv.z < -0.1 and player.position.y < 1.0:
+			stair_t = 0.0
+			stair_dir = 1
+		elif pp2.x > 0.9 and pp2.x < 2.1 and pp2.y > 8.35 and pp2.y < 9.1 and mv.z > 0.1 and player.position.y > 2.0:
+			stair_t = 1.0
+			stair_dir = -1
+	if stair_t >= 0.0:
+		var ascend := stair_dir > 0
+		if ascend:
+			stair_t += d / 2.5
+		else:
+			stair_t -= d / 2.5
+		var t := clampf(stair_t, 0.0, 1.0)
+		player.position = Vector3(1.5, t * 2.98, lerpf(13.55, 8.55, t))
+		player.velocity = Vector3.ZERO
+		if (ascend and stair_t >= 1.0) or (not ascend and stair_t <= 0.0):
+			stair_t = -1.0
+		skip_move = true
+		mv = Vector3.ZERO
+	if not skip_move:
+		var pb2 := Vector2(player.position.x, player.position.z)
+		player.move_and_slide()
 	if stamina < 0.5:
 		breath_timer -= d
 		if breath_timer <= 0.0:
@@ -2409,14 +2567,15 @@ func _process(d: float) -> void:
 		target_noise *= 0.7
 	noise = lerpf(noise, target_noise, 0.15)
 	var p2z := Vector2(player.position.x, player.position.z)
+	player_level = 1 if player.position.y > 1.6 else 0
 	for zi in range(CREEK_ZONES.size()):
 		creek_cd[zi] = maxf(0.0, creek_cd[zi] - d)
-		if creek_cd[zi] <= 0.0 and (Vector2(CREEK_ZONES[zi].x, CREEK_ZONES[zi].y) - p2z).length() < CREEK_ZONES[zi].z:
+		if creek_cd[zi] <= 0.0 and player_level == 0 and (Vector2(CREEK_ZONES[zi].x, CREEK_ZONES[zi].y) - p2z).length() < CREEK_ZONES[zi].z:
 			creek_cd[zi] = 3.0
 			play("creak", -8.0, 0.8)
 			noise = maxf(noise, 1.0)
 	for ci in range(CANDY_SPOTS.size()):
-		if not candy_taken[ci] and (CANDY_SPOTS[ci] - p2z).length() < 0.9:
+		if not candy_taken[ci] and (Vector2(CANDY_SPOTS[ci].x, CANDY_SPOTS[ci].z) - p2z).length() < 0.9 and player_level == (1 if CANDY_SPOTS[ci].y > 1.0 else 0):
 			candy_taken[ci] = true
 			pocket = mini(3, pocket + 1)
 			if ci < candy_meshes.size() and is_instance_valid(candy_meshes[ci]):
@@ -2425,13 +2584,13 @@ func _process(d: float) -> void:
 			_toast(tt("candy_pickup"), 3.0)
 			alert_t = maxf(alert_t, 1.5)
 	if key_mesh_e != null and is_instance_valid(key_mesh_e) and key_mesh_e.visible:
-		if p2z.distance_to(key_exit_pos) < 0.9:
+		if p2z.distance_to(key_exit_pos) < 0.9 and player_level == key_exit_lvl:
 			has_key_exit = true
 			key_mesh_e.visible = false
 			play("chime", -5.0)
 			_toast(tt("key_pick_e"), 3.5)
 	if key_mesh_c != null and is_instance_valid(key_mesh_c) and key_mesh_c.visible:
-		if p2z.distance_to(key_ch1_pos) < 0.9:
+		if p2z.distance_to(key_ch1_pos) < 0.9 and player_level == key_ch1_lvl:
 			has_key_ch1 = true
 			key_mesh_c.visible = false
 			play("chime", -5.0)
@@ -2459,7 +2618,8 @@ func _process(d: float) -> void:
 			play("chime", -8.0)
 	hidden = false
 	for hs in HIDE_SPOTS:
-		if p2z.distance_to(hs) < 0.8:
+		var hl := 1 if hs.y > 1.0 else 0
+		if p2z.distance_to(Vector2(hs.x, hs.z)) < 0.8 and player_level == hl:
 			hidden = true
 			if hide_cd <= 0.0:
 				hide_cd = 4.0
@@ -2481,16 +2641,18 @@ func _process(d: float) -> void:
 			ent_glued = true
 	if hidden and entity_mode != 0:
 		entity_mode = 0
-		entity_target = _node_of(epos2)
+		entity_target = _node_of(epos2, ent_level)
 	var hear_r := noise * 14.0
 	if hidden:
 		hear_r = 0.0
+	if player_level != ent_level:
+		hear_r *= 0.25
 	if dbg == "smart" or dbg == "blind":
 		hear_r = 0.0
 	if bait_timer > 0.0:
 		bait_timer -= d
 		entity_mode = 1
-		_move_entity_toward(bait_pos, 2.6, d)
+		_move_entity_toward(bait_pos, 2.6, d, bait_level)
 		if (bait_pos - epos2).length() < 0.8:
 			bait_timer = 0.0
 	elif entity_stun > 0.0:
@@ -2498,11 +2660,19 @@ func _process(d: float) -> void:
 	elif entity_mode == 2:
 		chase_t += d
 		var spd := 4.3 if candies.get("reglisse", false) else 3.6
-		_move_entity_toward(p2z, spd, d)
+		if player_level != ent_level:
+			var pth := _bfs_path(_node_of(epos2, ent_level), _node_of(p2z, player_level))
+			if pth.size() > 1:
+				var mid: Vector2 = NODES[pth[1]]
+				_move_entity_toward(mid, spd, d, NODE_LVL[pth[1]])
+			else:
+				_move_entity_toward(p2z, spd, d, player_level)
+		else:
+			_move_entity_toward(p2z, spd, d, player_level)
 		if chase_t > 6.0 and noise < 0.35:
 			entity_mode = 0
 			chase_t = 0.0
-			entity_target = _node_of(epos2)
+			entity_target = _node_of(epos2, ent_level)
 	elif dist < hear_r:
 		if noise > 0.6 and dist < 6.0:
 			entity_mode = 2
@@ -2511,17 +2681,18 @@ func _process(d: float) -> void:
 			entity_mode = 1
 		alert_t = 4.0
 		entity_target_pos = p2z
-		_move_entity_toward(p2z, 3.6 if entity_mode == 2 else 2.2, d)
+		entity_target_lvl = player_level
+		_move_entity_toward(p2z, 3.6 if entity_mode == 2 else 2.2, d, player_level)
 	else:
 		if entity_mode == 1:
 			_move_entity_toward(entity_target_pos, 2.2, d)
 			alert_t -= d
 			if (entity_target_pos - epos2).length() < 0.8 or alert_t <= 0.0:
 				entity_mode = 0
-				entity_target = _node_of(epos2)
+				entity_target = _node_of(epos2, ent_level)
 		elif entity_mode == 2:
 			entity_mode = 0
-			entity_target = _node_of(epos2)
+			entity_target = _node_of(epos2, ent_level)
 		else:
 			var tgt: Vector2 = NODES[entity_target]
 			if (tgt - epos2).length() < 0.5:
@@ -2540,18 +2711,18 @@ func _process(d: float) -> void:
 							break
 				entity_target = pick
 				tgt = NODES[entity_target]
-			_move_entity_toward(tgt, 1.15, d)
+			_move_entity_toward(tgt, 1.15, d, NODE_LVL[entity_target])
 	epos2 = Vector2(entity.position.x, entity.position.z)
 	dist = (epos2 - p2z).length()
 	entity.visible = true
 	graze_cd = maxf(0.0, graze_cd - d)
 	lock_cd = maxf(0.0, lock_cd - d)
 	hide_cd = maxf(0.0, hide_cd - d)
-	if dist < 0.85 and not hidden and dbg != "smart" and graze_cd <= 0.0:
+	if dist < 0.85 and absf(player.position.y - entity.position.y) < 1.2 and not hidden and dbg != "smart" and graze_cd <= 0.0:
 		if candies.get("caramel", false) and graze == 0:
 			graze = 1
 			entity_mode = 0
-			entity_target = _node_of(epos2)
+			entity_target = _node_of(epos2, ent_level)
 			play("sting", -6.0)
 			_toast(tt("graze"), 4.0)
 		elif entity_mode == 2:
@@ -2602,7 +2773,8 @@ func _process(d: float) -> void:
 				var foren := armn.get_node_or_null("Fore")
 				if foren != null:
 					foren.rotation.x = (-0.5 if entity_mode == 2 else -0.08) + sin(tt2 * 5.7 + sgn) * 0.08
-		entity.position.y = absf(sin(tt2 * 4.4)) * (0.055 if entity_mode == 2 else 0.012)
+		entity.position.y = lerpf(entity.position.y, _terrain_y(Vector2(entity.position.x, entity.position.z), ent_level), minf(1.0, 7.0 * d))
+		entity.position.y += absf(sin(tt2 * 4.4)) * (0.055 if entity_mode == 2 else 0.012)
 		ent_phase += d * (6.5 if entity_mode == 2 else 2.2)
 		for ln2 in ["LegL", "LegR"]:
 			var legn := entity.get_node_or_null(ln2)
@@ -2659,7 +2831,7 @@ func _dbg_shot(d: float) -> void:
 		[Vector3(4.2, 0, 3.2), PI * 0.75, ""],
 		[Vector3(10.2, 0, 4.0), PI, ""],
 		[Vector3(12.2, 0, 7), -PI / 2, "monster"],
-		[Vector3(2.0, 0, 9.3), PI, ""],
+		[Vector3(1.6, 3.1, 6.0), -PI / 2, ""],
 		[Vector3(17.2, 0, 7), -PI / 2, "exit"],
 	]
 	if shot_i >= poses.size():
@@ -2704,18 +2876,31 @@ func _dbg_shot(d: float) -> void:
 func _dbg_walk(d: float) -> void:
 	var p2 := Vector2(player.position.x, player.position.z)
 	var final_goal := exit_pos if has_key_exit else key_exit_pos
+	var final_lvl := 0 if has_key_exit else key_exit_lvl
+	if not has_key_exit and key_exit_lvl == 1:
+		final_goal = Vector2(1.5, 13.4)
+		final_lvl = 0
+		if (final_goal - p2).length() < 0.8:
+			has_key_exit = true
+			if key_mesh_e != null and is_instance_valid(key_mesh_e):
+				key_mesh_e.visible = false
 	if has_key_exit != dbg_had_key:
 		dbg_had_key = has_key_exit
-		dbg_path = _bfs_pts(_node_of(p2), _node_of(final_goal))
+		dbg_path = _bfs_path(_node_of(p2, bot_level), _node_of(final_goal, final_lvl))
 	if dbg_path.is_empty() and not dbg_done_path:
-		dbg_path = _bfs_pts(_node_of(spawn_pos), _node_of(final_goal))
+		dbg_path = _bfs_path(_node_of(spawn_pos, bot_level), _node_of(final_goal, final_lvl))
 		dbg_done_path = true
 	var goal: Vector2 = final_goal
-	if dbg_path.size() > 0:
-		goal = dbg_path[0]
+	var goal_lvl := final_lvl
+	if dbg_path.size() > 1:
+		goal = NODES[dbg_path[1]]
+		goal_lvl = NODE_LVL[dbg_path[1]]
 		if (goal - p2).length() < 0.5:
 			dbg_path.pop_front()
-			goal = final_goal if dbg_path.is_empty() else dbg_path[0]
+			if dbg_path.size() > 1:
+				goal = NODES[dbg_path[1]]
+				goal_lvl = NODE_LVL[dbg_path[1]]
+	bot_level = goal_lvl
 	var spd := 3.4
 	noise = 1.0
 	if dbg == "smart":
@@ -2738,11 +2923,12 @@ func _dbg_walk(d: float) -> void:
 	if dbg_stuck_t > 1.2 and dirv.length() > 0.01:
 		var perp := Vector2(-dirv.y, dirv.x) * dbg_jdir
 		var nudge := 1.1 if dbg_stuck_t < 3.0 else 2.4
-		player.position = Vector3(p2.x + perp.x * nudge, 0, p2.y + perp.y * nudge)
+		player.position = Vector3(p2.x + perp.x * nudge, _terrain_y(p2 + perp * nudge, bot_level), p2.y + perp.y * nudge)
 		dbg_stuck_t = 0.0
 		dbg_jdir = -dbg_jdir
 		p2 = Vector2(player.position.x, player.position.z)
-	player.position = Vector3(p2.x + dirv.x * spd * d, 0, p2.y + dirv.y * spd * d)
+	var np2 := p2 + dirv * (spd * d)
+	player.position = Vector3(np2.x, _terrain_y(np2, bot_level), np2.y)
 	stamina = 1.0
 
 
@@ -2765,7 +2951,7 @@ func _dbg_audit(d: float) -> void:
 				fail = "solid"
 		1:
 			_begin_run()
-			player.position = Vector3(CANDY_SPOTS[0].x, 0, CANDY_SPOTS[0].y)
+			player.position = Vector3(CANDY_SPOTS[0].x, 0, CANDY_SPOTS[0].z)
 		2:
 			if pocket < 2 or not candy_taken[0]:
 				fail = "candy"
@@ -2802,9 +2988,24 @@ func _dbg_audit(d: float) -> void:
 				if not crossed:
 					fail = "doors"
 					print("DOOR BLOCKED ", dp[0])
+			player.global_position = Vector3(1.5, 0.3, 13.5)
+			player.velocity = Vector3.ZERO
+			if entity != null and is_instance_valid(entity):
+				entity_stun = 999.0
+			dbg_move_frames = 420
+			dbg_move_dir = Vector2(0, -1)
+		6:
+			if dbg_move_frames > 0:
+				return
+			if player.global_position.y < 2.4 or player.global_position.z > 9.4:
+				fail = "stairs"
+				print("STAIRS BLOCKED ", player.global_position)
+			if _bfs_path(_node_of(Vector2(1.5, 7.6), 1), _node_of(exit_pos, 0)).size() < 2:
+				fail = "upbfs"
+			dbg_move_frames = 0
 			has_key_exit = true
 			player.position = Vector3(exit_pos.x - 0.8, 0, exit_pos.y)
-		6:
+		7:
 			if state != "win":
 				fail = "win"
 			else:
