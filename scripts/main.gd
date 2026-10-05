@@ -296,10 +296,7 @@ var cross_state := 0
 var cross_lat := 0.0
 var audit_i := 0
 var audit_timer := 0.0
-var quality_high := false
-# --- SOL DÉFINISSABLE (v11) : teinte et roughness du parquet, réglables ici ---
-var FLOOR_TINT := Color(1.0, 0.96, 0.90)
-var FLOOR_ROUGH := 0.85
+var quality_high := true
 var vhs_visible_pref := true
 var vol_master := 0.9
 var vol_music := 0.8
@@ -476,17 +473,17 @@ func _build_world() -> void:
 	env.glow_enabled = true
 	env.glow_intensity = 0.4
 	env.glow_bloom = 0.06
-	env.sdfgi_enabled = quality_high
-	env.volumetric_fog_enabled = quality_high
-	env.fog_enabled = not quality_high
-	env.fog_light_color = Color(0.05, 0.04, 0.06)
-	env.fog_sun_scatter = 0.1
-	env.fog_density = 0.015
-	env.fog_height = 1.2
-	env.fog_height_density = 0.6
+	env.sdfgi_enabled = true
+	env.volumetric_fog_enabled = true
 	env.volumetric_fog_density = 0.016
 	env.volumetric_fog_albedo = Color(0.55, 0.45, 0.4)
 	env.volumetric_fog_anisotropy = 0.45
+	# Preset SÛR auto : SDFGI + fog volumétrique sont instables sur pilotes Intel/Arc (et logiciels)
+	var gpu_n := RenderingServer.get_video_adapter_name().to_lower()
+	if gpu_n.contains("intel") or gpu_n.contains("arc") or gpu_n.contains("llvmpipe") or gpu_n.contains("lavapipe"):
+		quality_high = false
+		env.sdfgi_enabled = false
+		env.volumetric_fog_enabled = false
 	var we := WorldEnvironment.new()
 	we.environment = env
 	world.add_child(we)
@@ -618,10 +615,11 @@ func _wall_seg(x1: float, z1: float, x2: float, z2: float) -> void:
 	var cz := (z1 + z2) / 2.0
 	var ang := atan2(dz, dx)
 	var m := _pbr("wall")
-	var q := _quad(Vector2(ln, WALL_H), m)
-	q.rotation = Vector3(PI / 2, 0, -ang)
-	q.position = Vector3(cx, WALL_H / 2.0, cz)
-	world.add_child(q)
+	# v11 : BOÎTE (l'ancien quad était invisible d'un côté selon l'ordre des points -> murs qui disparaissent)
+	var wb := _box(Vector3(ln + WALL_T, WALL_H, WALL_T), m)
+	wb.position = Vector3(cx, WALL_H / 2.0, cz)
+	wb.rotation = Vector3(0, -ang, 0)
+	world.add_child(wb)
 	var col := StaticBody3D.new()
 	var bs := BoxShape3D.new()
 	bs.size = Vector3(ln + WALL_T, WALL_H, WALL_T)
@@ -632,12 +630,12 @@ func _wall_seg(x1: float, z1: float, x2: float, z2: float) -> void:
 	col.rotation = Vector3(0, -ang, 0)
 	world.add_child(col)
 
-
 func _room_floor(x1: float, z1: float, x2: float, z2: float, mat: StandardMaterial3D) -> void:
-	var q := _quad(Vector2(x2 - x1, z2 - z1), mat)
-	q.rotation = Vector3(PI / 2, 0, PI / 2)
-	q.position = Vector3((x1 + x2) / 2.0, 0.0, (z1 + z2) / 2.0)
-	world.add_child(q)
+	# v11 : dalle BOÎTE. L'ancien quad tourné (PI/2,0,PI/2) avait une normale VERTICALE
+	# (-1,0,0) -> sol invisible de dessus + mur fantôme vertical au centre de chaque pièce.
+	var sl := _box(Vector3(x2 - x1, 0.10, z2 - z1), mat)
+	sl.position = Vector3((x1 + x2) / 2.0, -0.05, (z1 + z2) / 2.0)
+	world.add_child(sl)
 
 
 func _furn(sz: Vector3, at: Vector3, m: StandardMaterial3D, rot_y := 0.0, rot_x := 0.0) -> MeshInstance3D:
@@ -694,20 +692,9 @@ func _door_panel(at: Vector2, side: float) -> void:
 
 func _build_house() -> void:
 	var fw := _pbr("floor")
-	fw.normal_enabled = true
-	fw.albedo_color = FLOOR_TINT
-	fw.roughness = FLOOR_ROUGH
+	fw.normal_enabled = false
 	var tilem := _pixel("res://assets/tex/tile.png")
 	tilem.roughness = 0.35
-	# fill-lights minimales : le sol reste lisible même sans torche
-	for fp in [Vector2(5, 7), Vector2(10, 7), Vector2(15, 7), Vector2(10, 2.8), Vector2(3, 11)]:
-		var fl := OmniLight3D.new()
-		fl.light_color = Color(1.0, 0.85, 0.65)
-		fl.light_energy = 1.1
-		fl.omni_range = 5.5
-		fl.shadow_enabled = false
-		fl.position = Vector3(fp.x, 2.6, fp.y)
-		world.add_child(fl)
 	# sols
 	_room_floor(0, 5.8, 20, 8.2, fw)
 	_room_floor(0, 0, 7, 5.8, fw)
@@ -717,11 +704,8 @@ func _build_house() -> void:
 	_room_floor(6, 8.2, 10, 14, fw)
 	_room_floor(10, 8.2, 15, 14, fw)
 	_room_floor(15, 8.2, 20, 14, fw)
-	# plafond
-	var cq := _quad(Vector2(H_W, H_D), _pbr("ceil"))
-	cq.rotation = Vector3(PI / 2, 0, PI / 2)
-	cq.position = Vector3(H_W / 2, WALL_H, H_D / 2)
-	world.add_child(cq)
+# plafond : assuré par la dalle de l'étage (boîtes 2.82-2.98), trémie de l'escalier laissée ouverte.
+# (l'ancien quad de plafond était un mur fantôme vertical qui coupait la maison en deux)
 	# murs extérieurs (ouverture sortie est z 6.4-7.6)
 	_wall_seg(0, 0, 20, 0)
 	_wall_seg(0, 14, 20, 14)
@@ -868,10 +852,11 @@ func _build_house() -> void:
 		_furn(Vector3(0.5, 0.5, 0.5), ub, _simple(Color(0.35, 0.26, 0.16), 0.8))
 	_furn(Vector3(2.0, 0.6, 1.6), Vector3(17.5, 3.28, 12.6), cloth)
 	var urug := _quad(Vector2(2.2, 1.6), _simple(Color(0.12, 0.08, 0.14), 0.9))
-	urug.rotation = Vector3(PI / 2, 0, 0)
+	urug.rotation = Vector3(0, 0, 0)
 	urug.position = Vector3(16.0, 3.0, 7.0)
 	world.add_child(urug)
 	var uwin := _quad(Vector2(1.4, 1.0), _emissive(Color(0.35, 0.42, 0.6), 1.1, ""))
+	uwin.rotation = Vector3(PI / 2, 0, 0)
 	uwin.position = Vector3(8.0, 4.2, 0.16)
 	world.add_child(uwin)
 	# lampes de l'étage (une allumée, une morte) + placard-cachette haut
@@ -947,11 +932,11 @@ func _build_house() -> void:
 		world.add_child(ht)
 	# détails : tapis, cartons, toiles d'araignée, citrouilles
 	var rug1 := _quad(Vector2(2.6, 1.8), _simple(Color(0.22, 0.06, 0.06), 0.9))
-	rug1.rotation = Vector3(PI / 2, 0, 0.1)
+	rug1.rotation = Vector3(0, 0.1, 0)
 	rug1.position = Vector3(3.5, 0.02, 2.8)
 	world.add_child(rug1)
 	var rug2 := _quad(Vector2(1.8, 1.3), _simple(Color(0.10, 0.10, 0.16), 0.9))
-	rug2.rotation = Vector3(PI / 2, 0, 0)
+	rug2.rotation = Vector3(0, 0, 0)
 	rug2.position = Vector3(17.5, 0.02, 11.4)
 	world.add_child(rug2)
 	var cartm := _simple(Color(0.35, 0.26, 0.16), 0.8)
@@ -979,7 +964,7 @@ func _build_house() -> void:
 	for cz in CREEK_ZONES:
 		for k3 in range(3):
 			var pl := _quad(Vector2(0.30, 1.15), dark_plank)
-			pl.rotation = Vector3(PI / 2, 0, 0.35 * (k3 - 1))
+			pl.rotation = Vector3(0, 0.35 * (k3 - 1), 0)
 			pl.position = Vector3(cz.x + 0.34 * (k3 - 1), 0.014, cz.y + 0.1 * (k3 - 1))
 			world.add_child(pl)
 	# bonbons posés dans la maison
@@ -1117,198 +1102,256 @@ func _make_pumpkin(at: Vector3, scale := 1.0) -> Node3D:
 
 
 func _make_entity() -> Node3D:
+	# « ELLE » v11 : grande silhouette voûtée 2,3 m, bras très longs tombant sous les genoux,
+	# tête aveugle enfoncée entre les épaules, mâchoire fendue, mains osseuses, loques.
 	var nd := Node3D.new()
 	var skin := StandardMaterial3D.new()
-	skin.albedo_color = Color(0.45, 0.42, 0.38)
-	skin.roughness = 0.55
-	var cloth := StandardMaterial3D.new()
-	cloth.albedo_color = Color(0.05, 0.045, 0.055)
-	cloth.roughness = 0.9
-	cloth.cull_mode = StandardMaterial3D.CULL_DISABLED
-	var blackm := StandardMaterial3D.new()
-	blackm.albedo_color = Color(0.0, 0.0, 0.0)
-	blackm.roughness = 0.15
-	var clawm := StandardMaterial3D.new()
-	clawm.albedo_color = Color(0.55, 0.50, 0.44)
-	clawm.roughness = 0.4
-	# jambes fines (genoux marqués)
+	skin.albedo_color = Color(0.56, 0.51, 0.45)
+	skin.roughness = 0.62
+	skin.rim_enabled = true
+	skin.rim = 0.7
+	skin.rim_tint = 0.6
+	skin.cull_mode = StandardMaterial3D.CULL_DISABLED
+	var rags := StandardMaterial3D.new()
+	rags.albedo_color = Color(0.055, 0.05, 0.065)
+	rags.roughness = 0.92
+	rags.cull_mode = StandardMaterial3D.CULL_DISABLED
+	var bone := StandardMaterial3D.new()
+	bone.albedo_color = Color(0.70, 0.66, 0.58)
+	bone.roughness = 0.45
+	var black := StandardMaterial3D.new()
+	black.albedo_color = Color(0.02, 0.02, 0.025)
+	black.roughness = 0.2
 	for si in range(2):
+		var sx := -0.13 if si == 0 else 0.13
 		var legp := Node3D.new()
 		legp.name = "LegL" if si == 0 else "LegR"
-		legp.position = Vector3(-0.11 if si == 0 else 0.11, 1.02, 0)
+		legp.position = Vector3(sx, 1.06, 0)
 		var thigh := MeshInstance3D.new()
-		var thm := CapsuleMesh.new()
-		thm.radius = 0.045
-		thm.height = 0.56
-		thigh.mesh = thm
+		var tm2 := CapsuleMesh.new()
+		tm2.radius = 0.055
+		tm2.height = 0.50
+		thigh.mesh = tm2
 		thigh.material_override = skin
-		thigh.position = Vector3(0, -0.28, 0)
+		thigh.position = Vector3(0, -0.25, 0)
 		legp.add_child(thigh)
 		var shin := MeshInstance3D.new()
-		var shm := CapsuleMesh.new()
-		shm.radius = 0.034
-		shm.height = 0.52
-		shin.mesh = shm
+		var sm2 := CapsuleMesh.new()
+		sm2.radius = 0.043
+		sm2.height = 0.50
+		shin.mesh = sm2
 		shin.material_override = skin
-		shin.position = Vector3(0, -0.76, 0.02)
+		shin.position = Vector3(0, -0.74, 0.03)
+		shin.rotation.x = 0.10
 		legp.add_child(shin)
 		var foot := MeshInstance3D.new()
-		var fm := BoxMesh.new()
-		fm.size = Vector3(0.07, 0.04, 0.20)
-		foot.mesh = fm
+		var fm2 := BoxMesh.new()
+		fm2.size = Vector3(0.085, 0.05, 0.15)
+		foot.mesh = fm2
 		foot.material_override = skin
-		foot.position = Vector3(0, -1.0, -0.05)
+		foot.position = Vector3(0, -1.01, -0.06)
 		legp.add_child(foot)
 		nd.add_child(legp)
-	# torse effilé sous tissu déchiré
-	var torso := MeshInstance3D.new()
-	var tm := CylinderMesh.new()
-	tm.top_radius = 0.24
-	tm.bottom_radius = 0.09
-	tm.height = 0.8
-	torso.mesh = tm
-	torso.material_override = cloth
-	torso.position = Vector3(0, 1.52, 0)
-	nd.add_child(torso)
-	for k in range(6):
-		var rag := MeshInstance3D.new()
-		var q := PlaneMesh.new()
-		q.size = Vector2(0.16 + (k % 3) * 0.07, 0.45 + (k % 2) * 0.25)
-		rag.mesh = q
-		rag.material_override = cloth
-		rag.position = Vector3(-0.15 + k * 0.06, 1.05 - (k % 2) * 0.12, -0.12 + (k % 3) * 0.12)
-		rag.rotation = Vector3(0.15, k * 1.05, 0.06)
-		nd.add_child(rag)
-	for sx3 in [-1.0, 1.0]:
+	var pelvis := MeshInstance3D.new()
+	var pvm := CylinderMesh.new()
+	pvm.top_radius = 0.15
+	pvm.bottom_radius = 0.14
+	pvm.height = 0.24
+	pelvis.mesh = pvm
+	pelvis.material_override = skin
+	pelvis.position = Vector3(0, 1.10, 0)
+	nd.add_child(pelvis)
+	var belly := MeshInstance3D.new()
+	var bvm := CapsuleMesh.new()
+	bvm.radius = 0.125
+	bvm.height = 0.42
+	belly.mesh = bvm
+	belly.material_override = skin
+	belly.position = Vector3(0, 1.34, 0.01)
+	nd.add_child(belly)
+	var chest := MeshInstance3D.new()
+	var cvm := CylinderMesh.new()
+	cvm.top_radius = 0.27
+	cvm.bottom_radius = 0.15
+	cvm.height = 0.56
+	chest.mesh = cvm
+	chest.material_override = skin
+	chest.position = Vector3(0, 1.74, -0.03)
+	chest.rotation.x = -0.24
+	nd.add_child(chest)
+	var vest := MeshInstance3D.new()
+	var vvm := CylinderMesh.new()
+	vvm.top_radius = 0.285
+	vvm.bottom_radius = 0.165
+	vvm.height = 0.50
+	vest.mesh = vvm
+	vest.material_override = rags
+	vest.position = Vector3(0, 1.74, -0.03)
+	vest.rotation.x = -0.24
+	nd.add_child(vest)
+	var hump := MeshInstance3D.new()
+	var hvm := SphereMesh.new()
+	hvm.radius = 0.15
+	hvm.height = 0.30
+	hump.mesh = hvm
+	hump.material_override = skin
+	hump.scale = Vector3(1.15, 0.85, 1.0)
+	hump.position = Vector3(0, 1.88, 0.11)
+	nd.add_child(hump)
+	for sxs in [-1.0, 1.0]:
 		var sh := MeshInstance3D.new()
-		var shm2 := SphereMesh.new()
-		shm2.radius = 0.07
-		sh.mesh = shm2
+		var shm := SphereMesh.new()
+		shm.radius = 0.085
+		shm.height = 0.17
+		sh.mesh = shm
 		sh.material_override = skin
-		sh.position = Vector3(sx3 * 0.24, 1.88, 0)
+		sh.position = Vector3(sxs * 0.245, 1.93, -0.04)
 		nd.add_child(sh)
-	# bras démesurés + mains à griffes
 	for sx2 in [-1.0, 1.0]:
 		var arm := Node3D.new()
 		arm.name = "ArmL" if sx2 < 0 else "ArmR"
-		arm.position = Vector3(sx2 * 0.26, 1.88, 0)
+		arm.position = Vector3(sx2 * 0.28, 1.96, -0.02)
 		var upper := MeshInstance3D.new()
 		var um := CapsuleMesh.new()
-		um.radius = 0.036
-		um.height = 0.74
+		um.radius = 0.047
+		um.height = 0.62
 		upper.mesh = um
 		upper.material_override = skin
-		upper.position = Vector3(0, -0.37, 0)
+		upper.position = Vector3(0, -0.31, 0)
 		arm.add_child(upper)
 		var fore := Node3D.new()
 		fore.name = "Fore"
-		fore.position = Vector3(0, -0.74, 0)
+		fore.position = Vector3(0, -0.62, 0)
 		var lower := MeshInstance3D.new()
 		var lom := CapsuleMesh.new()
-		lom.radius = 0.028
-		lom.height = 0.8
+		lom.radius = 0.038
+		lom.height = 0.66
 		lower.mesh = lom
 		lower.material_override = skin
-		lower.position = Vector3(0, -0.4, 0)
+		lower.position = Vector3(0, -0.33, 0)
 		fore.add_child(lower)
-		var palm := MeshInstance3D.new()
-		var pm := SphereMesh.new()
-		pm.radius = 0.055
-		palm.mesh = pm
-		palm.material_override = skin
-		palm.position = Vector3(0, -0.82, 0)
-		fore.add_child(palm)
-		for fi in range(4):
-			var claw := MeshInstance3D.new()
-			var cm := CylinderMesh.new()
-			cm.top_radius = 0.003
-			cm.bottom_radius = 0.016
-			cm.height = 0.32
-			claw.mesh = cm
-			claw.material_override = clawm
-			claw.position = Vector3((fi - 1.5) * 0.035, -0.95, -0.03)
-			claw.rotation = Vector3(0.45, 0, (fi - 1.5) * 0.16)
-			fore.add_child(claw)
+		var hand := _make_hand_v2(sx2, bone)
+		hand.position = Vector3(0, -0.70, 0)
+		fore.add_child(hand)
 		arm.add_child(fore)
 		nd.add_child(arm)
-	# tête penchée : crâne lisse SANS yeux, bouche ouverte verticale
+	var drap := MeshInstance3D.new()
+	var drap0 := BoxMesh.new()
+	drap0.size = Vector3(0.60, 0.24, 0.03)
+	drap.mesh = drap0
+	drap.material_override = rags
+	drap.position = Vector3(0, 1.97, 0.10)
+	drap.rotation.x = 0.25
+	nd.add_child(drap)
 	var head := Node3D.new()
 	head.name = "Head"
-	head.position = Vector3(0, 2.04, 0.18)
-	head.rotation = Vector3(0.15, 0, 0)
+	head.position = Vector3(0, 2.22, -0.15)
 	var skull := MeshInstance3D.new()
-	var skm := SphereMesh.new()
-	skm.radius = 0.20
-	skull.mesh = skm
+	var sm := SphereMesh.new()
+	sm.radius = 0.155
+	sm.height = 0.31
+	skull.mesh = sm
 	skull.material_override = skin
-	skull.scale = Vector3(0.80, 1.35, 0.95)
-	skull.position = Vector3(0, 0.12, 0.02)
+	skull.scale = Vector3(0.95, 1.05, 1.05)
 	head.add_child(skull)
+	var brow := MeshInstance3D.new()
+	var browm := BoxMesh.new()
+	browm.size = Vector3(0.24, 0.045, 0.055)
+	brow.mesh = browm
+	brow.material_override = skin
+	brow.position = Vector3(0, 0.055, -0.10)
+	head.add_child(brow)
 	var jaw := MeshInstance3D.new()
-	var jm := SphereMesh.new()
-	jm.radius = 0.13
-	jaw.mesh = jm
+	var jawm := BoxMesh.new()
+	jawm.size = Vector3(0.17, 0.07, 0.13)
+	jaw.mesh = jawm
 	jaw.material_override = skin
-	jaw.scale = Vector3(0.68, 1.15, 0.8)
-	jaw.position = Vector3(0, -0.06, -0.16)
+	jaw.position = Vector3(0, -0.115, -0.06)
 	head.add_child(jaw)
+	for ex in [-0.058, 0.058]:
+		var eye := MeshInstance3D.new()
+		var em := BoxMesh.new()
+		em.size = Vector3(0.052, 0.014, 0.012)
+		eye.mesh = em
+		eye.material_override = black
+		eye.position = Vector3(ex, 0.005, -0.135)
+		eye.rotation.z = 0.18 * signf(ex)
+		head.add_child(eye)
 	var mouth := MeshInstance3D.new()
 	var mm := BoxMesh.new()
-	mm.size = Vector3(0.08, 0.22, 0.06)
+	mm.size = Vector3(0.022, 0.15, 0.02)
 	mouth.mesh = mm
-	mouth.material_override = blackm
-	mouth.position = Vector3(0, -0.10, -0.22)
+	mouth.material_override = black
+	mouth.position = Vector3(0, -0.075, -0.128)
 	head.add_child(mouth)
-	for ti in range(3):
+	for ti in range(5):
 		var tooth := MeshInstance3D.new()
 		var tmm := BoxMesh.new()
-		tmm.size = Vector3(0.012, 0.024, 0.008)
+		tmm.size = Vector3(0.008, 0.02, 0.006)
 		tooth.mesh = tmm
-		tooth.material_override = skin
-		tooth.position = Vector3(-0.02 + ti * 0.02, 0.0, -0.205)
+		tooth.material_override = bone
+		tooth.position = Vector3(-0.012 if ti % 2 == 0 else 0.012, -0.03 - ti * 0.026, -0.138)
 		head.add_child(tooth)
 	nd.add_child(head)
+	for sr in [-1.0, 1.0]:
+		var shrag := MeshInstance3D.new()
+		var srgm := BoxMesh.new()
+		srgm.size = Vector3(0.20, 0.42, 0.02)
+		shrag.mesh = srgm
+		shrag.material_override = rags
+		shrag.position = Vector3(sr * 0.235, 1.80, 0.06)
+		shrag.rotation = Vector3(0.06, sr * 0.5, sr * 0.10)
+		nd.add_child(shrag)
+	for rq in range(7):
+		var ang := TAU * float(rq) / 7.0
+		var rag := MeshInstance3D.new()
+		var rgm := BoxMesh.new()
+		rgm.size = Vector3(0.18, 0.62 + 0.09 * float(rq % 3), 0.02)
+		rag.mesh = rgm
+		rag.material_override = rags
+		rag.position = Vector3(cos(ang) * 0.15, 1.02 - 0.03 * float(rq % 2), sin(ang) * 0.13)
+		rag.rotation = Vector3(0.06 * float(rq % 3) - 0.06, -ang, 0.05)
+		nd.add_child(rag)
 	var aura := OmniLight3D.new()
-	aura.light_color = Color(0.55, 0.65, 0.9)
-	aura.light_energy = 0.8
-	aura.omni_range = 2.6
-	aura.position = Vector3(0, 1.9, 0)
+	aura.light_color = Color(0.72, 0.68, 0.62)
+	aura.light_energy = 0.30
+	aura.omni_range = 1.9
+	aura.position = Vector3(0, 1.5, 0)
 	nd.add_child(aura)
 	return nd
 
-
-func _make_hand_v2(side: float, pale: StandardMaterial3D) -> Node3D:
+func _make_hand_v2(side: float, bone: StandardMaterial3D) -> Node3D:
 	var h := Node3D.new()
 	var palm := MeshInstance3D.new()
 	var pm := BoxMesh.new()
-	pm.size = Vector3(0.085, 0.10, 0.026)
+	pm.size = Vector3(0.075, 0.095, 0.024)
 	palm.mesh = pm
-	palm.material_override = pale
+	palm.material_override = bone
 	palm.position = Vector3(0, -0.05, 0)
 	h.add_child(palm)
-	var lengths: Array = [0.045, 0.034, 0.026]
+	var lengths: Array = [0.052, 0.040, 0.030]
 	for fi in range(4):
-		var fx := -0.030 + fi * 0.020
+		var fx := -0.027 + fi * 0.018
 		var py := -0.10
 		for ph in range(3):
 			var seg := MeshInstance3D.new()
 			var cm := CapsuleMesh.new()
-			cm.radius = 0.0075 - ph * 0.001
+			cm.radius = 0.008 - ph * 0.0012
 			cm.height = lengths[ph]
 			seg.mesh = cm
-			seg.material_override = pale
-			seg.position = Vector3(fx, py - lengths[ph] / 2.0, 0.005 * ph)
-			seg.rotation.x = 0.10 + 0.14 * ph
+			seg.material_override = bone
+			seg.position = Vector3(fx + 0.004 * ph, py - lengths[ph] / 2.0, 0.004 * ph)
+			seg.rotation.x = 0.09 + 0.16 * ph
 			h.add_child(seg)
-			py -= lengths[ph] * 0.94
+			py -= lengths[ph] * 0.93
 	var thumb := MeshInstance3D.new()
 	var tcm := CapsuleMesh.new()
 	tcm.radius = 0.009
-	tcm.height = 0.055
+	tcm.height = 0.06
 	thumb.mesh = tcm
-	thumb.material_override = pale
-	thumb.position = Vector3(side * 0.052, -0.045, 0.01)
-	thumb.rotation.z = side * 0.85
+	thumb.material_override = bone
+	thumb.position = Vector3(side * 0.048, -0.05, 0.008)
+	thumb.rotation.z = side * 0.9
 	h.add_child(thumb)
 	return h
 
@@ -1337,9 +1380,9 @@ func _draw_loop() -> void:
 	ma.emission_enabled = true
 	ma.emission = Color(1.0, 0.55, 0.15)
 	ma.emission_texture = ma.albedo_texture
-	ma.emission_energy = 2.6
+	ma.emission_energy = 1.2
 	ma.cull_mode = StandardMaterial3D.CULL_DISABLED
-	ghost_arrow = _quad(Vector2(0.9, 0.9), ma)
+	ghost_arrow = _quad(Vector2(0.8, 0.8), ma)
 	dyn.add_child(ghost_arrow)
 	var gold := _emissive(Color(1.0, 0.8, 0.2), 2.2, "")
 	var krm := TorusMesh.new()
@@ -1705,6 +1748,17 @@ func _build_ui() -> void:
 	sb.add_theme_font_size_override("font_size", 17)
 	sb.add_theme_color_override("font_color", Color(0.72, 0.72, 0.8))
 	title_ctl.add_child(sb)
+	var vtag := Label.new()
+	vtag.name = "Ver"
+	vtag.text = "v11 VISION"
+	vtag.position = Vector2(1180, 690)
+	vtag.size = Vector2(180, 24)
+	vtag.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	vtag.add_theme_font_size_override("font_size", 14)
+	vtag.add_theme_color_override("font_color", Color(0.85, 0.45, 0.12))
+	vtag.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
+	vtag.add_theme_constant_override("outline_size", 6)
+	title_ctl.add_child(vtag)
 	var lbtn := Button.new()
 	lbtn.name = "LangBtn"
 	lbtn.position = Vector2(790, 128)
@@ -2024,7 +2078,7 @@ func _load_settings() -> void:
 		vol_music = cf.get_value("s", "music", 0.8)
 		vol_sfx = cf.get_value("s", "sfx", 0.9)
 		mouse_sens = cf.get_value("s", "sens", 1.0)
-		quality_high = cf.get_value("s", "qual", false)
+		quality_high = cf.get_value("s", "qual", true)
 		vhs_visible_pref = cf.get_value("s", "vhs", true)
 		how_seen = cf.get_value("s", "how", false)
 	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(vol_master, 0.001)))
@@ -2390,7 +2444,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 				gmat.transparency_mode = 1
 				gmat.albedo_color = Color(0.9, 0.2, 0.55, 0.22)
 				var gm := _quad(Vector2(3.2, 3.2), gmat)
-				gm.rotation = Vector3(PI / 2, 0, 0)
+				gm.rotation = Vector3(0, 0, 0)
 				gm.position = Vector3(gpos.x, 0.03, gpos.y)
 				dyn.add_child(gm)
 				glue_zones.append([gpos, 8.0, gm])
@@ -2414,6 +2468,9 @@ func _unhandled_input(ev: InputEvent) -> void:
 					banner_lbl.visible = false
 					toast_lbl.visible = false
 					cap_lbl.visible = false
+			if ev.keycode == KEY_F2:
+				_toggle_quality()
+				_toast("QUALITE " + ("HAUTE" if quality_high else "BASSE") + "  (SDFGI/fog/glow)", 2.4)
 	if ev is InputEventMouseButton and ev.pressed and state == "intro":
 		_begin_run()
 		return
@@ -2440,8 +2497,7 @@ func _toggle_quality() -> void:
 	quality_high = not quality_high
 	env.volumetric_fog_enabled = quality_high
 	env.sdfgi_enabled = quality_high
-	env.fog_enabled = not quality_high
-	env.glow_enabled = true
+	env.glow_enabled = quality_high
 	for lp in lamps:
 		lp[0].shadow_enabled = quality_high
 
@@ -2450,7 +2506,7 @@ func _toggle_quality() -> void:
 func _process(d: float) -> void:
 	if dbg == "audit":
 		_dbg_audit(d)
-	if dbg == "shot" or dbg == "shotfx":
+	if dbg == "shot":
 		_dbg_shot(d)
 		return
 	if vhs.material:
@@ -2786,7 +2842,7 @@ func _process(d: float) -> void:
 		var headn := entity.get_node_or_null("Head")
 		if headn != null:
 			headn.rotation.z = sin(tt2 * 7.3) * 0.07
-			headn.rotation.x = sin(tt2 * 3.1) * 0.05 - (0.22 if entity_mode == 2 else 0.0)
+			headn.rotation.x = sin(tt2 * 3.1) * 0.05 - 0.12 - (0.22 if entity_mode == 2 else 0.0)
 			if entity_mode == 2 and fmod(run_time, 2.7) < 0.1:
 				headn.rotation.z = 0.6
 				headn.rotation.x = -0.4
@@ -2811,11 +2867,11 @@ func _process(d: float) -> void:
 	if ghost_arrow != null and is_instance_valid(ghost_arrow):
 		ghost_arrow.visible = hud_on
 		var dirv := (exit_pos - p2z).normalized()
-		var gp := p2z + dirv * 2.0
-		ghost_arrow.position = Vector3(gp.x, 0.03, gp.y)
-		ghost_arrow.rotation = Vector3(PI / 2, atan2(-dirv.y, dirv.x), PI / 4)
-		ghost_arrow.material_override.emission_energy = 1.6 + sin(run_time * 5.0) * 0.8
-		ghost_arrow.material_override.emission_energy = 1.6 + sin(run_time * 5.0) * 0.8
+		var gp := p2z + dirv * 1.7
+		var d_exit := (exit_pos - p2z).length()
+		ghost_arrow.position = Vector3(gp.x, 0.025, gp.y)
+		ghost_arrow.rotation = Vector3(0.0, atan2(dirv.x, dirv.y), 0.0)
+		ghost_arrow.material_override.emission_energy = (0.75 + sin(run_time * 4.0) * 0.2) * clampf(d_exit / 4.0, 0.0, 1.0)
 	osd_lbl.visible = hud_on and fmod(run_time, 1.6) < 0.95
 	if banner_timer > 0.0:
 		banner_timer -= d
@@ -2846,7 +2902,7 @@ func _process(d: float) -> void:
 
 # ============================================================ debug =======
 func _dbg_shot(d: float) -> void:
-	if shot_i == 0 and shot_frames == 0 and env != null and dbg != "shotfx":
+	if shot_i == 0 and shot_frames == 0 and env != null:
 		env.sdfgi_enabled = false
 		env.volumetric_fog_enabled = false
 		env.glow_enabled = false
@@ -2861,12 +2917,6 @@ func _dbg_shot(d: float) -> void:
 		[Vector3(1.6, 3.1, 6.0), -PI / 2, ""],
 		[Vector3(17.2, 0, 7), -PI / 2, "exit"],
 	]
-	if dbg == "shotfx":
-		dust.emitting = false
-		poses = [poses[0], poses[3]]
-		if shot_i >= 2:
-			get_tree().quit(0)
-			return
 	if shot_i >= poses.size():
 		get_tree().quit(0)
 		return
@@ -2882,21 +2932,26 @@ func _dbg_shot(d: float) -> void:
 	dust.emitting = true
 	if pose[2] == "monster" and entity != null and is_instance_valid(entity):
 		entity.visible = true
-		headlamp.light_energy = 3.0
-		entity.position = Vector3(15.0, 0, 7.75)
+		entity.position = Vector3(15.0, 0, 7.1)
 		entity.rotation.y = atan2(-(player.position.x - entity.position.x), -(player.position.z - entity.position.z))
 		var hl := entity.get_node_or_null("Head")
 		if hl != null:
-			hl.rotation.z = 0.18
-			hl.rotation.x = 0.28
-	var save_at := 30 if dbg == "shotfx" else 70
-	if shot_frames == save_at:
+			hl.rotation.z = 0.35
+			hl.rotation.x = -0.25
+		for an in ["ArmL", "ArmR"]:
+			var armn := entity.get_node_or_null(an)
+			if armn != null:
+				armn.rotation.x = -1.7
+				armn.rotation.z = (-1.0 if an == "ArmL" else 1.0) * 0.45
+				var fn := armn.get_node_or_null("Fore")
+				if fn != null:
+					fn.rotation.x = -0.6
+	if shot_frames == 70:
 		DirAccess.make_dir_recursive_absolute("/tmp/le31_shots")
 		var img := get_viewport().get_texture().get_image()
-		var pfx := "fx" if dbg == "shotfx" else "shot"
-		img.save_png("/tmp/le31_shots/%s%d.png" % [pfx, shot_i])
+		img.save_png("/tmp/le31_shots/shot%d.png" % shot_i)
 		print("SHOT ", shot_i, " saved")
-	if shot_frames >= (32 if dbg == "shotfx" else 72):
+	if shot_frames >= 72:
 		shot_i += 1
 		shot_frames = 0
 

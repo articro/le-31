@@ -72,20 +72,21 @@ Le projet « Marmite & Monstres » est ABANDONNÉ par l'utilisateur : ne JAMAIS 
 - **RÈGLE ANTI-CRASH (absolue)** : après chaque étape validée (parse OK, audit OK, matrice OK), commit + tag `v11-wip` + push AVANT tout rendu long ou toute opération risquée. Un rendu de shots ne se lance JAMAIS avec du travail non poussé.
 - Rendus shots : `sudo apt-get install -y xvfb mesa-vulkan-drivers` puis `xvfb-run -a Godot --path . --rendering-driver vulkan --resolution 960x540 --dbg=shot` (~5 min). JAMAIS lavapipe/lvp_icd.json (28 min, OOM, crash de turn).
 
-## 8. Règle « petits turns » (anti-crash plateforme, 5 oct 2026)
-- Des sessions neuves ont crashé (« Something went wrong ») sur des turns lourds (fetch multiples + rebuild + apt + audit + rendus en un seul message).
-- CONSÉQUENCE OBLIGATOIRE : une seule étape par message/turn. Ordre standard d'un démarrage :
-  turn 1 = récupérer + lire la mémoire, résumer en 5 puces, STOP ;
-  turn 2 = reconstruire le workspace (zip v10 ou tag v11-wip) + check-only, STOP ;
-  turn 3 = import + audit, STOP ; turn 4 = patch v11 A + push wip ; etc.
-- Jamais apt + import + audit + patch dans le même turn. Jamais de rendu shot dans un turn qui fait autre chose.
-- Si « Something went wrong » : renvoyer « continue » UNE fois ; si répété 3× avec des messages minuscules = incident plateforme, attendre 15 min ou changer d'onglet/navigateur.
-
-## 9. v11 EN COURS dans la session « mère » (5-6 oct 2026)
-- Tag `v11-wip` = bd3bbd2 ; pré-release v11-wip id 403688142 (zip LE31_projet_godot_v11wip.zip 48 188 082 o) pour test joueur.
-- Diagnostic bugs user v10 (murs/sol disparus) : SDFGI + brouillard volumétrique = effets GPU-dépendants (OOM lavapipe ici, trous noirs chez user) → v11 : `quality_high` DÉFAUT FALSE, fog classique en repli, glow toujours, ambient 0.30, 5 fill-lights 1.1/5.5 sans ombre. Option haute qualité reste dans le menu.
-- Sol : parquet régénéré plus clair (gen_pbr_h.py base 0.38, coeffs 205/150/100) + vars `FLOOR_TINT`/`FLOOR_ROUGH` en tête de main.gd (définissables) + normal_enabled.
-- Monstre v11 = concept user (uploads/monstre_v11_concept.png) : peau skin(0.45,0.42,0.38) r0.55, cloth sombre cull_disabled, jambes fines skin, torse cone cloth, 6 lambeaux quads, bras démesurés (upper 0.74 + fore 0.8 + paume + 4 griffes cylindres), tête Node3D y2.04 z0.18 tilt 0.15 : crâne sphere r0.20 scale(0.80,1.35,0.95) SANS yeux, bouche boîte noire (0.08,0.22,0.06) z-0.22 DEVANT le crâne (leçon : ne pas enterrer mouth/jaw dans le skull radius), 3 dents. Noms anim conservés (LegL/LegR/ArmL/ArmR/Fore/Head).
-- Mode dbg `shotfx` = rendu défaut (pose 0 couloir + pose 3 monstre décalée z7.75, headlamp 3.0 sur pose monstre) : `xvfb-run -a Godot --path . --rendering-driver vulkan --resolution 960x540 --dbg=shotfx` ~70 s. Dispatch = `if dbg == "shot" or dbg == "shotfx"`.
-- Matrice v11-wip verte : audit ALL OK 122 bodies ; smart/quiet×2/blind WIN ; walk CAUGHT×3.
-- RESTE v11 : captures officielles 6 poses quand user valide le wip, LANCEMENT.md maj, release v11 finale (tag v11), suppression pré-release wip éventuelle.
+## 8. v11 « VISION » (2026-10-05, session Arena 2)
+- **Bug racine trouvé (mesuré)** : `PlaneMesh` + rotation (PI/2,0,PI/2) → normale **(−1,0,0)** = plans VERTICAUX.
+  `_room_floor` (sols), le quad de plafond, `_wall_seg` (murs selon l'ordre des points), tapis, lattes,
+  flaque collante → tout ça était debout. D'où : sol absent, mur fantôme beige, murs noirs, caméra
+  « dans la géométrie ». Correctif : **boîtes pleines** partout (`_box`), dalles de sol 0,10 m par pièce,
+  plafond = dalles d'étage (trémie ouverte). UV mesurées : « haut » d'un PlaneMesh = **+Z local**
+  (yaw flèche = `atan2(dir.x, dir.y)`).
+- Monstre redessiné _make_entity : 2,3 m, dos voûté, bras très longs, mains osseuses, tête aveugle
+  dégagée, 7 lambeaux + 2 loques d'épaule ; animation existante conservée (LegL/LegR, bras, tête).
+- Preset SÛR auto : GPU Intel/Arc/llvmpipe → `quality_high=false` + SDFGI/fog coupés (dans `_build_world`,
+  APRÈS `_load_settings`) + **F2** bascule la qualité.
+- Livrables : `/home/user/LE31_projet_godot_v11.zip` (47,8 Mo, 119 fichiers), `LE31_v11_main.gd.zip`,
+  patch reproductible `/home/user/patch_v11a.py`, checkpoint `doc/checkpoints/main_v11b.gd`,
+  aperçu `doc/art/monstre_v10_vs_v11.png`, notes `doc/release_notes_v11.md`.
+- **Anti-OOM sandbox** : 2 vCPU / ~1,9 Go RAM → PAS de rendu de shots possible (llvmpipe = kill OOM).
+  Les captures de validation sont faites par l'utilisateur (GPU Arc A750) ou via `--dbg=shot` chez lui.
+- Piège nouveau : `pkill -x Godot_v4.3-...` ne matche PAS (comm tronqué à 15 car.) → utiliser
+  `pkill -f "[G]odot_v4.3-stable"` (le crochet évite de tuer son propre shell).

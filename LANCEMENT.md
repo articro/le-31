@@ -48,3 +48,21 @@
 - Bot prudent → **WIN** · Bot bruyant → **CAUGHT ×3** · Entité sourde → WIN.
 - Zéro asset externe : textures, PBR, audio et visuels 100 % générés par le pipeline maison
   (`tools/regen_h.sh`).
+
+## 7. NOUVEAU — v11 « VISION » (corrections des captures du 04/10)
+Bug racine trouvé et corrigé : les « sols », le « plafond » et plusieurs « murs » étaient en réalité
+des plans **verticaux** (normale (-1,0,0) mesurée par test Godot) → sol invisible, mur fantôme au
+centre des pièces, murs disparaissant selon l'angle. Tout est passé en **boîtes pleines** :
+- sols : 8 dalles-boîtes par pièce, texturées par pièce, aucun trou ni z-fighting ;
+- murs : boîtes (visibles des deux côtés) ;
+- plafond : dalles de l'étage, trémie de l'escalier ouverte ;
+- tapis, lattes grinçantes, flaque de sucre, fenêtre de l'étage : remis à plat ;
+- flèche au sol : plaque horizontale 0,8 m, orientée correctement (elle pointait à 180°), discrète ;
+- monstre redessiné : 2,3 m, dos voûté, bras longs, mains osseuses, tête aveugle dégagée, 7 loques.
+
+**Si ton GPU est Intel/Arc ou un pilote logiciel** : SDFGI + brouillard volumétrique sont coupés
+automatiquement au démarrage (causes connues de surfaces noires). Nouvelle touche **F2** :
+bascule Haute/Basse qualité en jeu (un message s'affiche).
+
+**À vérifier en jeu** : sol partout, plafond, murs sans trous, flèche plate devant toi,
+monstre dans le couloir (pose de la capture n°4 : approche-le en allumant la lampe G).
