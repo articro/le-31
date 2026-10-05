@@ -80,3 +80,12 @@ Le projet « Marmite & Monstres » est ABANDONNÉ par l'utilisateur : ne JAMAIS 
   turn 3 = import + audit, STOP ; turn 4 = patch v11 A + push wip ; etc.
 - Jamais apt + import + audit + patch dans le même turn. Jamais de rendu shot dans un turn qui fait autre chose.
 - Si « Something went wrong » : renvoyer « continue » UNE fois ; si répété 3× avec des messages minuscules = incident plateforme, attendre 15 min ou changer d'onglet/navigateur.
+
+## 9. v11 EN COURS dans la session « mère » (5-6 oct 2026)
+- Tag `v11-wip` = bd3bbd2 ; pré-release v11-wip id 403688142 (zip LE31_projet_godot_v11wip.zip 48 188 082 o) pour test joueur.
+- Diagnostic bugs user v10 (murs/sol disparus) : SDFGI + brouillard volumétrique = effets GPU-dépendants (OOM lavapipe ici, trous noirs chez user) → v11 : `quality_high` DÉFAUT FALSE, fog classique en repli, glow toujours, ambient 0.30, 5 fill-lights 1.1/5.5 sans ombre. Option haute qualité reste dans le menu.
+- Sol : parquet régénéré plus clair (gen_pbr_h.py base 0.38, coeffs 205/150/100) + vars `FLOOR_TINT`/`FLOOR_ROUGH` en tête de main.gd (définissables) + normal_enabled.
+- Monstre v11 = concept user (uploads/monstre_v11_concept.png) : peau skin(0.45,0.42,0.38) r0.55, cloth sombre cull_disabled, jambes fines skin, torse cone cloth, 6 lambeaux quads, bras démesurés (upper 0.74 + fore 0.8 + paume + 4 griffes cylindres), tête Node3D y2.04 z0.18 tilt 0.15 : crâne sphere r0.20 scale(0.80,1.35,0.95) SANS yeux, bouche boîte noire (0.08,0.22,0.06) z-0.22 DEVANT le crâne (leçon : ne pas enterrer mouth/jaw dans le skull radius), 3 dents. Noms anim conservés (LegL/LegR/ArmL/ArmR/Fore/Head).
+- Mode dbg `shotfx` = rendu défaut (pose 0 couloir + pose 3 monstre décalée z7.75, headlamp 3.0 sur pose monstre) : `xvfb-run -a Godot --path . --rendering-driver vulkan --resolution 960x540 --dbg=shotfx` ~70 s. Dispatch = `if dbg == "shot" or dbg == "shotfx"`.
+- Matrice v11-wip verte : audit ALL OK 122 bodies ; smart/quiet×2/blind WIN ; walk CAUGHT×3.
+- RESTE v11 : captures officielles 6 poses quand user valide le wip, LANCEMENT.md maj, release v11 finale (tag v11), suppression pré-release wip éventuelle.
