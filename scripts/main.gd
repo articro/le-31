@@ -572,6 +572,10 @@ var blackout_t := 0.0
 var blackout_cd := 55.0
 var blackout_on := false
 var ent_breath: AudioStreamPlayer3D = null
+var ent_growl: AudioStreamPlayer3D = null
+var ent_sniff: AudioStreamPlayer3D = null
+var growl_t := 1.5
+var sniff_t := 2.0
 var stair_dir := 1
 var dbg_move_dir := Vector2.ZERO
 var dbg_last_pos := Vector2.ZERO
@@ -1146,20 +1150,37 @@ func _make_entity() -> Node3D:
 	# « ELLE » v11 : grande silhouette voûtée 2,3 m, bras très longs tombant sous les genoux,
 	# tête aveugle enfoncée entre les épaules, mâchoire fendue, mains osseuses, loques.
 	var nd := Node3D.new()
+	# v12.2 : peau réaliste = texture cadavérique + normal map + rugosité + sous-surface (SSS)
 	var skin := StandardMaterial3D.new()
-	skin.albedo_color = Color(0.56, 0.51, 0.45)
-	skin.roughness = 0.62
+	skin.albedo_color = Color(0.62, 0.57, 0.52)
+	skin.albedo_texture = load("res://assets/tex/skin_albedo.png")
+	skin.normal_enabled = true
+	skin.normal_texture = load("res://assets/tex/skin_normal.png")
+	skin.normal_scale = 0.9
+	skin.roughness_texture = load("res://assets/tex/skin_rough.png")
+	skin.roughness = 1.0
+	skin.uv1_scale = Vector3(2.2, 2.2, 1.0)
+	skin.subsurf_scatter_enabled = true
+	skin.subsurf_scatter_strength = 0.22
 	skin.rim_enabled = true
 	skin.rim = 0.7
 	skin.rim_tint = 0.6
 	skin.cull_mode = StandardMaterial3D.CULL_DISABLED
 	var rags := StandardMaterial3D.new()
 	rags.albedo_color = Color(0.055, 0.05, 0.065)
-	rags.roughness = 0.92
+	rags.normal_enabled = true
+	rags.normal_texture = load("res://assets/tex/skin_normal.png")
+	rags.normal_scale = 1.6
+	rags.uv1_scale = Vector3(3.4, 3.4, 1.0)
+	rags.roughness = 0.94
 	rags.cull_mode = StandardMaterial3D.CULL_DISABLED
 	var bone := StandardMaterial3D.new()
 	bone.albedo_color = Color(0.70, 0.66, 0.58)
 	bone.roughness = 0.45
+	bone.normal_enabled = true
+	bone.normal_texture = load("res://assets/tex/skin_normal.png")
+	bone.normal_scale = 0.5
+	bone.uv1_scale = Vector3(4.0, 4.0, 1.0)
 	var black := StandardMaterial3D.new()
 	black.albedo_color = Color(0.02, 0.02, 0.025)
 	black.roughness = 0.2
@@ -1441,6 +1462,21 @@ func _make_entity() -> Node3D:
 	ent_breath.max_distance = 16.0
 	ent_breath.position = Vector3(0, 1.9, 0)
 	nd.add_child(ent_breath)
+	# v12.2 : grognement (chasse) et reniflement (proximité) — on la PISTE au son
+	ent_growl = AudioStreamPlayer3D.new()
+	ent_growl.stream = load("res://assets/audio/growl.wav")
+	ent_growl.volume_db = -8.0
+	ent_growl.unit_size = 9.0
+	ent_growl.max_distance = 26.0
+	ent_growl.position = Vector3(0, 1.7, 0)
+	nd.add_child(ent_growl)
+	ent_sniff = AudioStreamPlayer3D.new()
+	ent_sniff.stream = load("res://assets/audio/sniff.wav")
+	ent_sniff.volume_db = -10.0
+	ent_sniff.unit_size = 5.0
+	ent_sniff.max_distance = 14.0
+	ent_sniff.position = Vector3(0, 1.9, -0.2)
+	nd.add_child(ent_sniff)
 	return nd
 
 func _make_hand_v2(side: float, bone: StandardMaterial3D) -> Node3D:
@@ -2518,11 +2554,16 @@ func _caught() -> void:
 		alert_t = 0.0
 		chase_t = 0.0
 		if entity != null and is_instance_valid(entity):
-			if ent_breath != null and is_instance_valid(ent_breath):
-				ent_breath.stop()
+			for pp3 in [ent_breath, ent_growl, ent_sniff]:
+				if pp3 != null and is_instance_valid(pp3):
+					pp3.stop()
 			entity.queue_free()
 		entity = null
 		ent_breath = null
+		ent_growl = null
+		ent_sniff = null
+		growl_t = 1.5
+		sniff_t = 2.0
 		_spawn_chaser()
 		noise = 0.0
 		stamina = maxf(stamina, 0.6)
@@ -3071,6 +3112,22 @@ func _process(d: float) -> void:
 				ent_breath.play()
 			ent_breath.volume_db = (-9.0 if entity_mode == 2 else (-16.0 if entity_mode == 1 else -22.0))
 			ent_breath.pitch_scale = 1.30 if entity_mode == 2 else (1.12 if entity_mode == 1 else 1.0)
+		var dend := Vector2(entity.position.x, entity.position.z).distance_to(p2z)
+		if ent_growl != null and is_instance_valid(ent_growl):
+			if entity_mode == 2:
+				growl_t -= d
+				if growl_t <= 0.0 and not ent_growl.playing:
+					ent_growl.play()
+					growl_t = rng.randf_range(3.2, 6.0)
+			else:
+				growl_t = minf(growl_t, 0.8)
+		if ent_sniff != null and is_instance_valid(ent_sniff) and dend < 5.5 and entity_mode >= 1:
+			sniff_t -= d
+			if sniff_t <= 0.0 and not ent_sniff.playing:
+				ent_sniff.play()
+				sniff_t = rng.randf_range(2.4, 5.5)
+		else:
+			sniff_t = minf(sniff_t, 1.6)
 		entity.position.y = lerpf(entity.position.y, _terrain_y(Vector2(entity.position.x, entity.position.z), ent_level), minf(1.0, 7.0 * d))
 		entity.position.y += absf(sin(tt2 * 4.4)) * (0.055 if entity_mode == 2 else 0.012)
 		ent_phase += d * (6.5 if entity_mode == 2 else 2.2)

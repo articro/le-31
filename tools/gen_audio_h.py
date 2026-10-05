@@ -371,3 +371,33 @@ for i in range(f):
 write2("music.wav", L, R)
 
 print("AUDIO H OK")
+
+# ---- growl : grognement grave de la créature (2,4 s) ----
+n = int(SR * 2.4)
+s = []
+r2 = random.Random(77)
+for i in range(n):
+    t = i / SR
+    base = math.sin(2 * math.pi * 62 * t) * 0.5 + math.sin(2 * math.pi * 93 * t) * 0.3 + math.sin(2 * math.pi * 41 * t) * 0.4
+    mod = 0.55 + 0.45 * math.sin(2 * math.pi * 3.1 * t)
+    grit = (r2.random() * 2 - 1) * 0.22
+    sub = math.sin(2 * math.pi * 17 * t) * 0.25
+    v = (base * mod + grit + sub)
+    v = math.tanh(v * 1.6)
+    s.append(v * env(n, a=0.35, r=0.9)[i])
+write("growl.wav", s)
+
+# ---- sniff : reniflement (0,55 s, deux inspirations) ----
+n = int(SR * 0.55)
+s = []
+r3 = random.Random(913)
+for i in range(n):
+    t = i / SR
+    burst = 0.0
+    for (st, ln) in ((0.0, 0.16), (0.24, 0.20)):
+        if st <= t < st + ln:
+            k = (t - st) / ln
+            burst += math.sin(math.pi * k) * (1.0 - k * 0.35)
+    v = burst * ((r3.random() * 2 - 1) * 0.9 + math.sin(2 * math.pi * 230 * t) * 0.12)
+    s.append(v)
+write("sniff.wav", s)
