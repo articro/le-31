@@ -1118,149 +1118,155 @@ func _make_pumpkin(at: Vector3, scale := 1.0) -> Node3D:
 
 func _make_entity() -> Node3D:
 	var nd := Node3D.new()
-	var dark := StandardMaterial3D.new()
-	dark.albedo_color = Color(0.06, 0.055, 0.075)
-	dark.roughness = 0.85
-	dark.rim_enabled = true
-	dark.rim = 1.0
-	dark.rim_tint = 0.75
-	dark.cull_mode = StandardMaterial3D.CULL_DISABLED
-	var pale := StandardMaterial3D.new()
-	pale.albedo_color = Color(0.74, 0.70, 0.64)
-	pale.roughness = 0.5
-	var black := StandardMaterial3D.new()
-	black.albedo_color = Color(0.0, 0.0, 0.0)
-	black.roughness = 0.15
+	var skin := StandardMaterial3D.new()
+	skin.albedo_color = Color(0.45, 0.42, 0.38)
+	skin.roughness = 0.55
+	var cloth := StandardMaterial3D.new()
+	cloth.albedo_color = Color(0.05, 0.045, 0.055)
+	cloth.roughness = 0.9
+	cloth.cull_mode = StandardMaterial3D.CULL_DISABLED
+	var blackm := StandardMaterial3D.new()
+	blackm.albedo_color = Color(0.0, 0.0, 0.0)
+	blackm.roughness = 0.15
+	var clawm := StandardMaterial3D.new()
+	clawm.albedo_color = Color(0.55, 0.50, 0.44)
+	clawm.roughness = 0.4
+	# jambes fines (genoux marqués)
 	for si in range(2):
-		var sx := -0.13 if si == 0 else 0.13
 		var legp := Node3D.new()
 		legp.name = "LegL" if si == 0 else "LegR"
-		legp.position = Vector3(sx, 1.15, 0)
-		var leg := MeshInstance3D.new()
-		var lm := CapsuleMesh.new()
-		lm.radius = 0.05
-		lm.height = 1.2
-		leg.mesh = lm
-		leg.material_override = dark
-		leg.position = Vector3(0, -0.6, 0)
-		legp.add_child(leg)
+		legp.position = Vector3(-0.11 if si == 0 else 0.11, 1.02, 0)
+		var thigh := MeshInstance3D.new()
+		var thm := CapsuleMesh.new()
+		thm.radius = 0.045
+		thm.height = 0.56
+		thigh.mesh = thm
+		thigh.material_override = skin
+		thigh.position = Vector3(0, -0.28, 0)
+		legp.add_child(thigh)
+		var shin := MeshInstance3D.new()
+		var shm := CapsuleMesh.new()
+		shm.radius = 0.034
+		shm.height = 0.52
+		shin.mesh = shm
+		shin.material_override = skin
+		shin.position = Vector3(0, -0.76, 0.02)
+		legp.add_child(shin)
+		var foot := MeshInstance3D.new()
+		var fm := BoxMesh.new()
+		fm.size = Vector3(0.07, 0.04, 0.20)
+		foot.mesh = fm
+		foot.material_override = skin
+		foot.position = Vector3(0, -1.0, -0.05)
+		legp.add_child(foot)
 		nd.add_child(legp)
+	# torse effilé sous tissu déchiré
 	var torso := MeshInstance3D.new()
 	var tm := CylinderMesh.new()
-	tm.top_radius = 0.36
+	tm.top_radius = 0.24
 	tm.bottom_radius = 0.09
-	tm.height = 1.0
+	tm.height = 0.8
 	torso.mesh = tm
-	torso.material_override = dark
-	torso.position = Vector3(0, 1.68, 0)
+	torso.material_override = cloth
+	torso.position = Vector3(0, 1.52, 0)
 	nd.add_child(torso)
+	for k in range(6):
+		var rag := MeshInstance3D.new()
+		var q := PlaneMesh.new()
+		q.size = Vector2(0.16 + (k % 3) * 0.07, 0.45 + (k % 2) * 0.25)
+		rag.mesh = q
+		rag.material_override = cloth
+		rag.position = Vector3(-0.15 + k * 0.06, 1.05 - (k % 2) * 0.12, -0.12 + (k % 3) * 0.12)
+		rag.rotation = Vector3(0.15, k * 1.05, 0.06)
+		nd.add_child(rag)
+	for sx3 in [-1.0, 1.0]:
+		var sh := MeshInstance3D.new()
+		var shm2 := SphereMesh.new()
+		shm2.radius = 0.07
+		sh.mesh = shm2
+		sh.material_override = skin
+		sh.position = Vector3(sx3 * 0.24, 1.88, 0)
+		nd.add_child(sh)
+	# bras démesurés + mains à griffes
 	for sx2 in [-1.0, 1.0]:
 		var arm := Node3D.new()
 		arm.name = "ArmL" if sx2 < 0 else "ArmR"
-		arm.position = Vector3(sx2 * 0.30, 2.06, 0)
+		arm.position = Vector3(sx2 * 0.26, 1.88, 0)
 		var upper := MeshInstance3D.new()
 		var um := CapsuleMesh.new()
-		um.radius = 0.042
-		um.height = 0.66
+		um.radius = 0.036
+		um.height = 0.74
 		upper.mesh = um
-		upper.material_override = dark
-		upper.position = Vector3(0, -0.33, 0)
+		upper.material_override = skin
+		upper.position = Vector3(0, -0.37, 0)
 		arm.add_child(upper)
 		var fore := Node3D.new()
 		fore.name = "Fore"
-		fore.position = Vector3(0, -0.66, 0)
+		fore.position = Vector3(0, -0.74, 0)
 		var lower := MeshInstance3D.new()
 		var lom := CapsuleMesh.new()
-		lom.radius = 0.034
-		lom.height = 0.70
+		lom.radius = 0.028
+		lom.height = 0.8
 		lower.mesh = lom
-		lower.material_override = dark
-		lower.position = Vector3(0, -0.35, 0)
+		lower.material_override = skin
+		lower.position = Vector3(0, -0.4, 0)
 		fore.add_child(lower)
-		var hand := _make_hand_v2(sx2, pale)
-		hand.position = Vector3(0, -0.72, 0)
-		fore.add_child(hand)
+		var palm := MeshInstance3D.new()
+		var pm := SphereMesh.new()
+		pm.radius = 0.055
+		palm.mesh = pm
+		palm.material_override = skin
+		palm.position = Vector3(0, -0.82, 0)
+		fore.add_child(palm)
+		for fi in range(4):
+			var claw := MeshInstance3D.new()
+			var cm := CylinderMesh.new()
+			cm.top_radius = 0.003
+			cm.bottom_radius = 0.016
+			cm.height = 0.32
+			claw.mesh = cm
+			claw.material_override = clawm
+			claw.position = Vector3((fi - 1.5) * 0.035, -0.95, -0.03)
+			claw.rotation = Vector3(0.45, 0, (fi - 1.5) * 0.16)
+			fore.add_child(claw)
 		arm.add_child(fore)
 		nd.add_child(arm)
-	var spine := MeshInstance3D.new()
-	var spm := CylinderMesh.new()
-	spm.top_radius = 0.06
-	spm.bottom_radius = 0.10
-	spm.height = 0.75
-	spine.mesh = spm
-	spine.material_override = dark
-	spine.position = Vector3(0, 1.98, -0.14)
-	spine.rotation.x = 0.5
-	nd.add_child(spine)
-	for sxs in [-0.22, 0.22]:
-		var sh := MeshInstance3D.new()
-		var shm := CylinderMesh.new()
-		shm.top_radius = 0.02
-		shm.bottom_radius = 0.10
-		shm.height = 0.28
-		sh.mesh = shm
-		sh.material_override = dark
-		sh.position = Vector3(sxs, 2.02, -0.06)
-		sh.rotation.x = -0.5
-		nd.add_child(sh)
-	for st in range(3):
-		var rag := _quad(Vector2(0.13, 0.55), dark)
-		rag.position = Vector3(-0.16 + st * 0.16, 1.02, -0.13 - st * 0.03)
-		rag.rotation = Vector3(0.25, 0, 0.12 * (st - 1))
-		nd.add_child(rag)
-	var neck := MeshInstance3D.new()
-	var nm := CylinderMesh.new()
-	nm.top_radius = 0.045
-	nm.bottom_radius = 0.07
-	nm.height = 0.18
-	neck.mesh = nm
-	neck.material_override = pale
-	neck.position = Vector3(0, 2.24, 0)
-	nd.add_child(neck)
+	# tête penchée : crâne lisse SANS yeux, bouche ouverte verticale
 	var head := Node3D.new()
 	head.name = "Head"
-	head.position = Vector3(0, 2.50, 0)
+	head.position = Vector3(0, 2.04, 0.18)
+	head.rotation = Vector3(0.15, 0, 0)
 	var skull := MeshInstance3D.new()
-	var sm := SphereMesh.new()
-	sm.radius = 0.20
-	sm.height = 0.40
-	skull.mesh = sm
-	skull.material_override = pale
-	skull.scale = Vector3(0.95, 1.6, 1.0)
+	var skm := SphereMesh.new()
+	skm.radius = 0.20
+	skull.mesh = skm
+	skull.material_override = skin
+	skull.scale = Vector3(0.80, 1.35, 0.95)
+	skull.position = Vector3(0, 0.12, 0.02)
 	head.add_child(skull)
-	for ex in [-0.062, 0.062]:
-		var eye := MeshInstance3D.new()
-		var em := SphereMesh.new()
-		em.radius = 0.048
-		em.height = 0.096
-		eye.mesh = em
-		eye.material_override = black
-		eye.position = Vector3(ex * 1.25, 0.06, -0.145)
-		eye.scale = Vector3(1.0, 1.5, 0.55)
-		head.add_child(eye)
+	var jaw := MeshInstance3D.new()
+	var jm := SphereMesh.new()
+	jm.radius = 0.13
+	jaw.mesh = jm
+	jaw.material_override = skin
+	jaw.scale = Vector3(0.68, 1.15, 0.8)
+	jaw.position = Vector3(0, -0.06, -0.16)
+	head.add_child(jaw)
 	var mouth := MeshInstance3D.new()
 	var mm := BoxMesh.new()
-	mm.size = Vector3(0.12, 0.22, 0.06)
+	mm.size = Vector3(0.08, 0.22, 0.06)
 	mouth.mesh = mm
-	mouth.material_override = black
-	mouth.position = Vector3(0, -0.14, -0.13)
+	mouth.material_override = blackm
+	mouth.position = Vector3(0, -0.10, -0.22)
 	head.add_child(mouth)
-	for ti in range(5):
+	for ti in range(3):
 		var tooth := MeshInstance3D.new()
 		var tmm := BoxMesh.new()
-		tmm.size = Vector3(0.012, 0.028, 0.008)
+		tmm.size = Vector3(0.012, 0.024, 0.008)
 		tooth.mesh = tmm
-		tooth.material_override = pale
-		tooth.position = Vector3(-0.04 + ti * 0.02, -0.055, -0.155)
+		tooth.material_override = skin
+		tooth.position = Vector3(-0.02 + ti * 0.02, 0.0, -0.205)
 		head.add_child(tooth)
-	for ti2 in range(4):
-		var tooth2 := MeshInstance3D.new()
-		var tmm2 := BoxMesh.new()
-		tmm2.size = Vector3(0.012, 0.024, 0.008)
-		tooth2.mesh = tmm2
-		tooth2.material_override = pale
-		tooth2.position = Vector3(-0.03 + ti2 * 0.02, -0.225, -0.155)
-		head.add_child(tooth2)
 	nd.add_child(head)
 	var aura := OmniLight3D.new()
 	aura.light_color = Color(0.55, 0.65, 0.9)
@@ -2857,6 +2863,7 @@ func _dbg_shot(d: float) -> void:
 	]
 	if dbg == "shotfx":
 		dust.emitting = false
+		poses = [poses[0], poses[3]]
 		if shot_i >= 2:
 			get_tree().quit(0)
 			return
@@ -2875,20 +2882,13 @@ func _dbg_shot(d: float) -> void:
 	dust.emitting = true
 	if pose[2] == "monster" and entity != null and is_instance_valid(entity):
 		entity.visible = true
-		entity.position = Vector3(15.0, 0, 7.1)
+		headlamp.light_energy = 3.0
+		entity.position = Vector3(15.0, 0, 7.75)
 		entity.rotation.y = atan2(-(player.position.x - entity.position.x), -(player.position.z - entity.position.z))
 		var hl := entity.get_node_or_null("Head")
 		if hl != null:
-			hl.rotation.z = 0.35
-			hl.rotation.x = -0.25
-		for an in ["ArmL", "ArmR"]:
-			var armn := entity.get_node_or_null(an)
-			if armn != null:
-				armn.rotation.x = -1.7
-				armn.rotation.z = (-1.0 if an == "ArmL" else 1.0) * 0.45
-				var fn := armn.get_node_or_null("Fore")
-				if fn != null:
-					fn.rotation.x = -0.6
+			hl.rotation.z = 0.18
+			hl.rotation.x = 0.28
 	var save_at := 30 if dbg == "shotfx" else 70
 	if shot_frames == save_at:
 		DirAccess.make_dir_recursive_absolute("/tmp/le31_shots")
