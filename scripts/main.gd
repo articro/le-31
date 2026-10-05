@@ -399,6 +399,9 @@ void fragment() {
 	COLOR = vec4(mix(orig, c, fade), 1.0);
 }
 """
+# ================= v15 : monstre a 6 parties (T-pose, bras animes) =================
+var ent_model_kind := 1        # 1 = v15 (6 parties) · 0 = v13 (4 parties)
+var dbg_m2_i := 0
 var cam_held := false          # clic droit maintenu
 var cam_sticky := false        # T (bascule)
 var cam_raised := false
@@ -1215,6 +1218,11 @@ func _make_pumpkin(at: Vector3, scale := 1.0) -> Node3D:
 
 
 func _make_entity() -> Node3D:
+	# v15 : monstre T-pose a 6 parties (bras animes) par defaut ; v13 en repli ; --dbg=model1 force la v13.
+	if dbg != "nomodel" and dbg != "model1" and ent_model_kind == 1 and ResourceLoader.exists("res://assets/models/monstre2_body.obj"):
+		var md2 := _build_entity_model2()
+		if md2 != null:
+			return md2
 	# v13 : si le modele sculpte (TRELLIS) est present, on l'utilise ; sinon repli procedural.
 	if dbg != "nomodel" and ResourceLoader.exists("res://assets/models/monstre_body.obj"):
 		var md := _build_entity_model()
@@ -1699,26 +1707,10 @@ func _draw_loop() -> void:
 	var krm := TorusMesh.new()
 	krm.inner_radius = 0.03
 	krm.outer_radius = 0.05
-	key_mesh_e = Node3D.new()
-	var kb1 := _box(Vector3(0.14, 0.03, 0.05), gold)
-	key_mesh_e.add_child(kb1)
-	var kr1 := MeshInstance3D.new()
-	kr1.mesh = krm
-	kr1.material_override = gold
-	kr1.position = Vector3(-0.09, 0, 0)
-	kr1.rotation = Vector3(PI / 2, 0, 0)
-	key_mesh_e.add_child(kr1)
+	key_mesh_e = _key_model(gold)
 	key_mesh_e.position = Vector3(key_exit_pos.x, key_exit_y + 0.14, key_exit_pos.y)
 	dyn.add_child(key_mesh_e)
-	key_mesh_c = Node3D.new()
-	var kb2 := _box(Vector3(0.14, 0.03, 0.05), gold)
-	key_mesh_c.add_child(kb2)
-	var kr2 := MeshInstance3D.new()
-	kr2.mesh = krm
-	kr2.material_override = gold
-	kr2.position = Vector3(-0.09, 0, 0)
-	kr2.rotation = Vector3(PI / 2, 0, 0)
-	key_mesh_c.add_child(kr2)
+	key_mesh_c = _key_model(gold)
 	key_mesh_c.position = Vector3(key_ch1_pos.x, key_ch1_y + 0.14, key_ch1_pos.y)
 	dyn.add_child(key_mesh_c)
 
@@ -2108,7 +2100,7 @@ func _build_ui() -> void:
 	title_ctl.add_child(sb)
 	var vtag := Label.new()
 	vtag.name = "Ver"
-	vtag.text = "v14 VISEUR"
+	vtag.text = "v15 MOUVEMENT"
 	vtag.position = Vector2(1180, 690)
 	vtag.size = Vector2(180, 24)
 	vtag.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -2888,6 +2880,19 @@ func _unhandled_input(ev: InputEvent) -> void:
 				if cam_sticky and battery <= 0.0:
 					cam_sticky = false
 					_toast(tt("cam_empty"), 3.0)
+			if ev.keycode == KEY_F3:
+				ent_model_kind = 1 - ent_model_kind
+				var kp := Vector3.ZERO
+				var km := entity_mode
+				if entity != null and is_instance_valid(entity):
+					kp = entity.position
+					entity.queue_free()
+				entity = null
+				_spawn_chaser()
+				if entity != null and is_instance_valid(entity):
+					entity.position = kp
+					entity_mode = km
+				_toast("MONSTRE : %s" % ("v15 SIX PARTIES (bras animes)" if ent_model_kind == 1 else "v13 QUATRE PARTIES"), 2.5)
 			if ev.keycode == KEY_R:
 				_do_rewind()
 				headlamp.visible = headlamp_on
@@ -2941,6 +2946,9 @@ func _process(d: float) -> void:
 		_dbg_audit(d)
 	if dbg == "cam":
 		_dbg_cam(d)
+	if dbg == "m2":
+		_dbg_m2(d)
+		return
 	if dbg == "shot":
 		_dbg_shot(d)
 		return
@@ -3314,6 +3322,11 @@ func _process(d: float) -> void:
 		hint_lbl.text = tt("hint_move") if run_time < 6.0 else ""
 	if ghost_arrow != null and is_instance_valid(ghost_arrow):
 		ghost_arrow.visible = hud_on
+	# v15 : les cles tournent lentement sur elles-memes (elles attirent l'oeil dans le noir)
+	if key_mesh_e != null and is_instance_valid(key_mesh_e):
+		key_mesh_e.rotation.y = run_time * 0.7
+	if key_mesh_c != null and is_instance_valid(key_mesh_c):
+		key_mesh_c.rotation.y = run_time * 0.7
 	if entity != null and is_instance_valid(entity) and entity.visible:
 		var sp2 := 1.0 + entity_mode * 1.2
 		var tt2 := run_time * sp2
@@ -3336,8 +3349,13 @@ func _process(d: float) -> void:
 			if armn != null:
 				var sgn := -1.0 if an == "ArmL" else 1.0
 				var sw := sin(tt2 * 5.0 + (0.0 if sgn > 0 else PI)) * (0.45 if entity_mode == 2 else 0.15)
-				armn.rotation.x = (-1.15 if entity_mode == 2 else sin(ent_phase + (PI if sgn > 0 else 0.0)) * 0.3) + sw * 0.25 + sin(tt2 * 11.0) * 0.02
-				armn.rotation.z = sgn * ((0.75 if entity_mode == 2 else 0.10) + sin(tt2 * 6.1) * 0.05)
+				if ent_model_kind == 1:
+					# v15 : les bras du modele T-pose pendent le long du corps et balancent en marchant
+					armn.rotation.x = (-0.90 if entity_mode == 2 else sin(ent_phase + (PI if sgn > 0 else 0.0)) * (0.40 if entity_mode == 1 else 0.22)) + sin(tt2 * 11.0) * 0.02
+					armn.rotation.z = -sgn * (0.22 if entity_mode == 2 else 0.528) + sin(tt2 * 6.1) * 0.04
+				else:
+					armn.rotation.x = (-1.15 if entity_mode == 2 else sin(ent_phase + (PI if sgn > 0 else 0.0)) * 0.3) + sw * 0.25 + sin(tt2 * 11.0) * 0.02
+					armn.rotation.z = sgn * ((0.75 if entity_mode == 2 else 0.10) + sin(tt2 * 6.1) * 0.05)
 				var foren := armn.get_node_or_null("Fore")
 				if foren != null:
 					foren.rotation.x = (-0.5 if entity_mode == 2 else -0.08) + sin(tt2 * 5.7 + sgn) * 0.08
@@ -3809,3 +3827,167 @@ func _dbg_cam(d: float) -> void:
 	elif dbg_cam_i == 4 and run_time > 13.0:
 		print("DBG cam=OK")
 		get_tree().quit(0)
+
+
+# ======================================================= v15 : monstre 6 parties ====
+func _key_model(mat: StandardMaterial3D) -> Node3D:
+	# vraie cle : tige + anneau + panneton + deux dents
+	var n := Node3D.new()
+	var shaft := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.006
+	cm.bottom_radius = 0.006
+	cm.height = 0.135
+	cm.radial_segments = 10
+	shaft.mesh = cm
+	shaft.material_override = mat
+	shaft.rotation = Vector3(0, 0, PI / 2)
+	n.add_child(shaft)
+	var bow := MeshInstance3D.new()
+	var tm := TorusMesh.new()
+	tm.inner_radius = 0.026
+	tm.outer_radius = 0.045
+	tm.ring_segments = 20
+	bow.mesh = tm
+	bow.material_override = mat
+	bow.position = Vector3(-0.085, 0, 0)
+	bow.rotation = Vector3(PI / 2, 0, 0)
+	n.add_child(bow)
+	for ti in range(2):
+		var tooth := MeshInstance3D.new()
+		var bx := BoxMesh.new()
+		bx.size = Vector3(0.012, 0.024, 0.010)
+		tooth.mesh = bx
+		tooth.material_override = mat
+		tooth.position = Vector3(0.028 + ti * 0.020, -0.015, 0)
+		n.add_child(tooth)
+	var far := MeshInstance3D.new()
+	var fb := BoxMesh.new()
+	fb.size = Vector3(0.040, 0.013, 0.010)
+	far.mesh = fb
+	far.material_override = mat
+	far.position = Vector3(0.052, 0, 0)
+	n.add_child(far)
+	return n
+
+
+func _build_entity_model2() -> Node3D:
+	# v15 : monstre T-pose decoupe en 6 parties (bras separes -> ils bougent vraiment)
+	var b2 = load("res://assets/models/monstre2_body.obj")
+	var h2 = load("res://assets/models/monstre2_head.obj")
+	var ll2 = load("res://assets/models/monstre2_legL.obj")
+	var lr2 = load("res://assets/models/monstre2_legR.obj")
+	var al2 = load("res://assets/models/monstre2_armL.obj")
+	var ar2 = load("res://assets/models/monstre2_armR.obj")
+	var tx2 = load("res://assets/models/monstre2_tex.png")
+	if b2 == null or h2 == null or ll2 == null or lr2 == null or al2 == null or ar2 == null or tx2 == null:
+		return null
+	if dbg != "":
+		print("DBG entity=MODEL3D TPOSE (6 parties, bras animes)")
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = tx2
+	m.albedo_color = Color(0.70, 0.68, 0.66)
+	m.roughness = 0.74
+	m.metallic = 0.0
+	m.subsurf_scatter_enabled = true
+	m.subsurf_scatter_strength = 0.14
+	m.rim_enabled = true
+	m.rim = 0.55
+	m.rim_tint = 0.6
+	m.cull_mode = StandardMaterial3D.CULL_DISABLED
+	var nd := Node3D.new()
+	var HIP := 0.94
+	var NECK := 2.00
+	var SHY := 1.88
+	var SHX := 0.30
+	var body := MeshInstance3D.new()
+	body.name = "Body"
+	body.mesh = b2
+	body.material_override = m
+	body.position = Vector3(0, HIP, 0)
+	nd.add_child(body)
+	for pr in [["LegR", lr2, -0.20], ["LegL", ll2, 0.20]]:
+		var lp := Node3D.new()
+		lp.name = pr[0]
+		lp.position = Vector3(0, HIP, 0)
+		lp.rotation = Vector3(0, 0, pr[2])
+		var mi := MeshInstance3D.new()
+		mi.mesh = pr[1]
+		mi.material_override = m
+		lp.add_child(mi)
+		nd.add_child(lp)
+	for pr2 in [["ArmR", ar2, SHX, -0.528], ["ArmL", al2, -SHX, 0.528]]:
+		var ap := Node3D.new()
+		ap.name = pr2[0]
+		ap.position = Vector3(pr2[2], SHY, 0)
+		ap.rotation = Vector3(0, 0, pr2[3])
+		var mi2 := MeshInstance3D.new()
+		mi2.mesh = pr2[1]
+		mi2.material_override = m
+		ap.add_child(mi2)
+		nd.add_child(ap)
+	var hd := Node3D.new()
+	hd.name = "Head"
+	hd.position = Vector3(0, NECK, 0)
+	var hm := MeshInstance3D.new()
+	hm.mesh = h2
+	hm.material_override = m
+	hd.add_child(hm)
+	nd.add_child(hd)
+	var aura := OmniLight3D.new()
+	aura.light_color = Color(0.72, 0.68, 0.62)
+	aura.light_energy = 0.30
+	aura.omni_range = 1.9
+	aura.position = Vector3(0, 1.5, 0)
+	nd.add_child(aura)
+	ent_breath = AudioStreamPlayer3D.new()
+	ent_breath.stream = load("res://assets/audio/breath.wav")
+	ent_breath.volume_db = -22.0
+	ent_breath.unit_size = 6.0
+	ent_breath.max_distance = 16.0
+	ent_breath.position = Vector3(0, 1.9, 0)
+	nd.add_child(ent_breath)
+	ent_growl = AudioStreamPlayer3D.new()
+	ent_growl.stream = load("res://assets/audio/growl.wav")
+	ent_growl.volume_db = -8.0
+	ent_growl.unit_size = 9.0
+	ent_growl.max_distance = 26.0
+	ent_growl.position = Vector3(0, 1.7, 0)
+	nd.add_child(ent_growl)
+	ent_sniff = AudioStreamPlayer3D.new()
+	ent_sniff.stream = load("res://assets/audio/sniff.wav")
+	ent_sniff.volume_db = -10.0
+	ent_sniff.unit_size = 5.0
+	ent_sniff.max_distance = 14.0
+	ent_sniff.position = Vector3(0, 1.9, -0.2)
+	nd.add_child(ent_sniff)
+	return nd
+
+
+func _dbg_m2(d: float) -> void:
+	dbg_m2_i += 1
+	if dbg_m2_i < 3:
+		return
+	var m := _build_entity_model2()
+	if m == null:
+		print("DBG m2=ECHEC")
+		get_tree().quit(1)
+		return
+	var total := 0
+	for c in m.get_children():
+		if not (c is Node3D):
+			continue
+		var tris := 0
+		if c is MeshInstance3D and c.mesh is ArrayMesh:
+			var arr: Array = (c.mesh as ArrayMesh).surface_get_arrays(0)
+			tris = (arr[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
+		else:
+			for cc in c.get_children():
+				if cc is MeshInstance3D and cc.mesh is ArrayMesh:
+					var a2: Array = (cc.mesh as ArrayMesh).surface_get_arrays(0)
+					tris += (a2[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
+		total += tris
+		print("DBG m2 node=%-5s tri=%-6d pos=%s rot=%s" % [c.name, tris, c.position.snapped(Vector3(0.01, 0.01, 0.01)), c.rotation.snapped(Vector3(0.01, 0.01, 0.01))])
+	print("DBG m2 total_tris=", total)
+	print("DBG m2 OK")
+	get_tree().quit(0)
