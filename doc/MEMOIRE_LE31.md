@@ -147,3 +147,25 @@ Le projet « Marmite & Monstres » est ABANDONNÉ par l'utilisateur : ne JAMAIS 
   (2) `raw.githubusercontent` = cache CDN -> verifier par l'API contents ;
   (3) import Godot headless : `--import` ecrit 8 `.import` (~45 s) ;
   (4) warning LOD « non-finite normal » sans gravite.
+
+### v14 VISEUR — le camescope Hi8 (2026-10-05)
+- **Camera A** (choix utilisateur) : clic droit maintenu ou **T** leve le viseur ; shader plein ecran
+  (`CAM_SHADER`, const dans main.gd) = teinte verte + desaturation + grain + scanlines + vignette + glitch.
+  HUD : `● REC  HI8  31 OCT 1997  hh:mm:ss  [BATT n%]` (horodatage = 23:10 + run_time).
+- **Batterie** : 100 % au depart, -0,62 %/s viseur leve, bip (+ son `lowbatt.wav`) sous 20 %, extinction a 0.
+  **5 piles** (+35 %) posees aux NOTE_SPOTS decalees (0.45, +0.02, 0.35) via `_spawn_pile()` ; ramassage
+  a moins de 1,5 m (et |dy| < 1,6).
+- **Rembobinage (R)** : -9 % batterie, cooldown 7 s, duree 1,5 s ; gelee de la creature (position restauree
+  chaque frame = `rewind_pos`, mode force a 0) ; traînee des 20 dernieres secondes (echantillon 0,1 s,
+  210 points max) tracee en ImmediateMesh additif sans test de profondeur ; le bruit pose
+  `bait_pos = position joueur` + `bait_timer = 3,5 s` -> **elle vient voir**.
+- **Marqueur** : sphere additive rouge a y 2,45 sur la creature, visible seulement au viseur (`ent_marker`,
+  recree automatiquement a chaque respawn de l'entite).
+- **Sons generes (numpy one-off)** : `cam_click.wav` (0,14 s), `tape_rewind.wav` (1,4 s, moteur + flutter
+  + clics), `lowbatt.wav` (0,62 s, deux bips).
+- **Piege de code** : les ancres du patch doivent tenir compte du fait que les blocs `if scare_t` et
+  `if entity != null ... entity.visible` sont DEJA apres le deplacement de l'entite dans `_process` :
+  `_cam_update(d)` est insere juste avant `if scare_t > 0.0:` pour pouvoir la geler APRES son propre
+  deplacement de frame.
+- Validation : AUDIT ALL OK (122 bodies) ; bot quiet seed 5 = WIN (1 prise) ; `--dbg=cam` = 5 piles,
+  grade 1,0, batterie 100 -> 87,6, traînee 76 points.

@@ -16,9 +16,16 @@ const TR := {
 	"fr": {
 		"title": "LE 31",
 		"sub": "une nuit dans la maison hantée",
+		"cam_rec": "CAMÉSCOPE",
+		"cam_batt": "BATT %d%%",
+		"cam_rewind": "\u25c0\u25c0 REMBOBINAGE \u2014 elle t'a entendu",
+		"cam_low": "PAS ASSEZ DE BATTERIE POUR REMBOBINER",
+		"cam_empty": "BATTERIE VIDE \u2014 le caméscope s'éteint",
+		"cam_pile": "PILE +%d%%",
+		"cam_pick": "[R] rembobiner  \u00b7  [PILES] recharger le caméscope",
 		"play": "ENTRER",
 		"warn": "casque recommandé — ne joue pas dans le noir… ou si.",
-		"controls": "ZQSD / WASD / flèches : marcher · MAJ : courir (endurance !) · SOURIS : regarder · G : lampe torche · E : lancer un bonbon (diversion) · F : sucre collant (ralentit) · V : grain VHS · ÉCHAP : pause",
+		"controls": "ZQSD / WASD / flèches : marcher · MAJ : courir (endurance !) · SOURIS : regarder · CLIC DROIT ou T : CAMÉSCOPE (voir dans le noir) · R : REMBOBINER 20 s (batterie + ça l'attire) · G : lampe torche · E : lancer un bonbon (diversion) · F : sucre collant (ralentit) · V : grain VHS · ÉCHAP : pause",
 		"rules_tip": "Lis la pancarte. Obéis.",
 		"exit_lbl": "SORTIE",
 		"progress": "SORTIE : %d m",
@@ -127,9 +134,16 @@ const TR := {
 	"en": {
 		"title": "OCT 31",
 		"sub": "one night in the haunted house",
+		"cam_rec": "CAMCORDER",
+		"cam_batt": "BATT %d%%",
+		"cam_rewind": "\u25c0\u25c0 REWINDING \u2014 she heard you",
+		"cam_low": "NOT ENOUGH BATTERY TO REWIND",
+		"cam_empty": "BATTERY DEAD \u2014 the camcorder shuts off",
+		"cam_pile": "BATTERY +%d%%",
+		"cam_pick": "[R] rewind  \u00b7  [BATTERIES] recharge the camcorder",
 		"play": "ENTER",
 		"warn": "headphones recommended — don't play in the dark… actually, do.",
-		"controls": "WASD / ZQSD / arrows: walk · SHIFT: run (stamina!) · MOUSE: look · G: flashlight · E: throw candy (decoy) · F: sticky sugar (slows her) · V: VHS grain · ESC: pause",
+		"controls": "WASD / ZQSD / arrows: walk · SHIFT: run (stamina!) · MOUSE: look · RIGHT CLICK or T: CAMCORDER (see in the dark) · R: REWIND 20 s (battery + it draws her) · G: flashlight · E: throw candy (decoy) · F: sticky sugar (slows her) · V: VHS grain · ESC: pause",
 		"rules_tip": "Read the sign. Obey.",
 		"exit_lbl": "EXIT",
 		"progress": "EXIT: %d m",
@@ -354,6 +368,60 @@ var stam_fill: ColorRect = null
 var hands: Node3D = null
 var headlamp: SpotLight3D = null
 var headlamp_on := true
+# ================= v14 : CAMERA A (camescope Hi8) =================
+const CAM_SHADER := """
+shader_type canvas_item;
+uniform sampler2D screen_tex : hint_screen_texture, filter_linear;
+uniform float fade := 1.0;
+uniform float vig := 0.92;
+uniform float grain := 0.09;
+uniform float scan := 0.10;
+uniform float glitch := 0.0;
+uniform vec3 tint := vec3(0.60, 1.00, 0.68);
+float h21(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+void fragment() {
+	vec2 uv = SCREEN_UV;
+	float jit = (h21(vec2(floor(uv.y * 200.0), floor(TIME * 22.0))) - 0.5) * glitch * 0.06;
+	uv.x += jit;
+	vec3 orig = texture(screen_tex, SCREEN_UV).rgb;
+	vec3 c = texture(screen_tex, uv).rgb;
+	float l = dot(c, vec3(0.299, 0.587, 0.114));
+	c = mix(c, vec3(l), 0.55);
+	c *= tint;
+	float n = h21(uv * vec2(1280.0, 720.0) + vec2(TIME * 91.0, TIME * 57.0));
+	c += (n - 0.5) * (grain + glitch * 0.40);
+	float sl = sin(uv.y * 640.0 + TIME * 2.0) * 0.5 + 0.5;
+	c *= 1.0 - sl * scan;
+	vec2 dv = uv - vec2(0.5);
+	dv.x *= 1.30;
+	float v = smoothstep(0.78, 0.20, length(dv));
+	c *= mix(0.10, 1.0, v);
+	COLOR = vec4(mix(orig, c, fade), 1.0);
+}
+"""
+var cam_held := false          # clic droit maintenu
+var cam_sticky := false        # T (bascule)
+var cam_raised := false
+var cam_grade := 0.0
+var battery := 100.0
+var battery_charges := 0
+var rewinding := 0.0
+var rewind_cd := 0.0
+var rewind_pos := Vector3.ZERO
+var lowbatt_t := 1.5
+var trail: Array = []
+var trail_t := 0.0
+var trail_mi: MeshInstance3D = null
+var ent_marker: MeshInstance3D = null
+var cam_overlay: ColorRect = null
+var cam_lbl: Label = null
+var batt_bg: ColorRect = null
+var batt_fill: ColorRect = null
+var sfx_click: AudioStreamPlayer = null
+var sfx_tape: AudioStreamPlayer = null
+var sfx_lowbatt: AudioStreamPlayer = null
+var piles: Array = []
+var dbg_cam_i := 0
 var dust: GPUParticles3D = null
 var candies := {}
 var pocket := 1
@@ -1766,6 +1834,18 @@ func _build_player() -> void:
 	headlamp.shadow_enabled = false
 	headlamp.position = Vector3(0, -0.05, 0)
 	cam.add_child(headlamp)
+	sfx_click = AudioStreamPlayer.new()
+	sfx_click.stream = load("res://assets/audio/cam_click.wav")
+	sfx_click.volume_db = -7.0
+	add_child(sfx_click)
+	sfx_tape = AudioStreamPlayer.new()
+	sfx_tape.stream = load("res://assets/audio/tape_rewind.wav")
+	sfx_tape.volume_db = -3.0
+	add_child(sfx_tape)
+	sfx_lowbatt = AudioStreamPlayer.new()
+	sfx_lowbatt.stream = load("res://assets/audio/lowbatt.wav")
+	sfx_lowbatt.volume_db = -9.0
+	add_child(sfx_lowbatt)
 	dust = GPUParticles3D.new()
 	dust.amount = 55
 	dust.lifetime = 6.0
@@ -1937,6 +2017,38 @@ func _build_ui() -> void:
 	pocket_lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 	pocket_lbl.add_theme_constant_override("outline_size", 3)
 	ui.add_child(pocket_lbl)
+	# ---- v14 : viseur du camescope (sous les autres elements HUD) ----
+	var cr := ColorRect.new()
+	cr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var csh := Shader.new()
+	csh.code = CAM_SHADER
+	var csm := ShaderMaterial.new()
+	csm.shader = csh
+	cr.material = csm
+	cr.visible = false
+	ui.add_child(cr)
+	ui.move_child(cr, 0)
+	cam_overlay = cr
+	cam_lbl = Label.new()
+	cam_lbl.position = Vector2(16, 38)
+	cam_lbl.size = Vector2(700, 26)
+	cam_lbl.add_theme_font_size_override("font_size", 17)
+	cam_lbl.add_theme_color_override("font_color", Color(0.55, 1.0, 0.62))
+	cam_lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+	cam_lbl.add_theme_constant_override("outline_size", 5)
+	cam_lbl.visible = false
+	ui.add_child(cam_lbl)
+	batt_bg = ColorRect.new()
+	batt_bg.position = Vector2(12, 658)
+	batt_bg.size = Vector2(164, 10)
+	batt_bg.color = Color(0, 0, 0, 0.5)
+	ui.add_child(batt_bg)
+	batt_fill = ColorRect.new()
+	batt_fill.position = Vector2(14, 660)
+	batt_fill.size = Vector2(160, 6)
+	batt_fill.color = Color(0.30, 0.85, 0.42, 0.85)
+	ui.add_child(batt_fill)
 	stam_bg = ColorRect.new()
 	stam_bg.position = Vector2(12, 690)
 	stam_bg.size = Vector2(164, 10)
@@ -1962,7 +2074,7 @@ func _build_ui() -> void:
 	noise_lbl.text = tt("noise_lbl")
 	noise_lbl.add_theme_color_override("font_color", Color(0.85, 0.3, 0.22))
 	ui.add_child(noise_lbl)
-	hud_nodes = [hud_lbl, hint_lbl, ts_lbl, banner_lbl, toast_lbl, cap_lbl, obj_lbl, osd_lbl, stam_bg, stam_fill, pocket_lbl, noise_bg, noise_fill, noise_lbl]
+	hud_nodes = [hud_lbl, hint_lbl, ts_lbl, banner_lbl, toast_lbl, cap_lbl, obj_lbl, osd_lbl, stam_bg, stam_fill, pocket_lbl, noise_bg, noise_fill, noise_lbl, cam_lbl, batt_bg, batt_fill]
 	# menu principal : le couloir vit derrière (caméra qui dérive)
 	title_ctl = Control.new()
 	title_ctl.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -1996,7 +2108,7 @@ func _build_ui() -> void:
 	title_ctl.add_child(sb)
 	var vtag := Label.new()
 	vtag.name = "Ver"
-	vtag.text = "v13 CLAIRVOYANCE"
+	vtag.text = "v14 VISEUR"
 	vtag.position = Vector2(1180, 690)
 	vtag.size = Vector2(180, 24)
 	vtag.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -2473,6 +2585,28 @@ func _begin_run() -> void:
 	pocket = 1
 	noise = 0.0
 	bait_timer = 0.0
+	# ---- v14 : camescope & piles ----
+	battery = 100.0
+	battery_charges = 0
+	cam_sticky = false
+	cam_held = false
+	cam_raised = false
+	cam_grade = 0.0
+	rewinding = 0.0
+	rewind_cd = 0.0
+	lowbatt_t = 1.5
+	trail.clear()
+	trail_t = 0.0
+	for pi2 in range(piles.size()):
+		if is_instance_valid(piles[pi2][1]):
+			piles[pi2][1].queue_free()
+	piles.clear()
+	for sp in NOTE_SPOTS:
+		_spawn_pile(Vector3(sp.x + 0.45, sp.y + 0.02, sp.z + 0.35))
+	if cam_overlay != null:
+		cam_overlay.visible = false
+	if cam_lbl != null:
+		cam_lbl.visible = false
 	graze_cd = 0.0
 	candy_taken = [false, false, false, false, false]
 	creek_cd = [0.0, 0.0, 0.0, 0.0, 0.0]
@@ -2697,6 +2831,9 @@ func _unhandled_input(ev: InputEvent) -> void:
 	if ev is InputEventMouseMotion and state == "play" and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		yaw -= ev.relative.x * 0.0022 * mouse_sens
 		pitch = clampf(pitch - ev.relative.y * 0.0021 * mouse_sens, -1.1, 1.1)
+	if ev is InputEventMouseButton and state == "play":
+		if ev.button_index == MOUSE_BUTTON_RIGHT:
+			cam_held = ev.pressed
 	if ev is InputEventKey and ev.pressed:
 		if ev.keycode == KEY_ESCAPE and state == "play":
 			_do_pause()
@@ -2746,6 +2883,13 @@ func _unhandled_input(ev: InputEvent) -> void:
 				_toast(tt("crouch_on") if crouch else tt("crouch_off"), 1.8)
 			if ev.keycode == KEY_G:
 				headlamp_on = not headlamp_on
+			if ev.keycode == KEY_T:
+				cam_sticky = not cam_sticky
+				if cam_sticky and battery <= 0.0:
+					cam_sticky = false
+					_toast(tt("cam_empty"), 3.0)
+			if ev.keycode == KEY_R:
+				_do_rewind()
 				headlamp.visible = headlamp_on
 				dust.emitting = headlamp_on
 				play("creak", -14.0, 1.6)
@@ -2795,6 +2939,8 @@ func _toggle_quality() -> void:
 func _process(d: float) -> void:
 	if dbg == "audit":
 		_dbg_audit(d)
+	if dbg == "cam":
+		_dbg_cam(d)
 	if dbg == "shot":
 		_dbg_shot(d)
 		return
@@ -3224,6 +3370,7 @@ func _process(d: float) -> void:
 			if legn != null:
 				legn.rotation.x = sin(ent_phase + (0.0 if ln2 == "LegL" else PI)) * (0.8 if entity_mode == 2 else 0.35)
 		entity.rotation.x = 0.14 if entity_mode == 2 else 0.04
+	_cam_update(d)
 	if scare_t > 0.0:
 		scare_t += d
 		var sk := clampf(scare_t / 0.6, 0.0, 1.0)
@@ -3463,3 +3610,202 @@ func _dbg_audit(d: float) -> void:
 		print("AUDIT FAIL step=", audit_i, " ", fail)
 		get_tree().quit(1)
 	audit_i += 1
+
+
+# ============================================================ v14 : CAMERA A =====
+func _spawn_pile(pv: Vector3) -> void:
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.05, 0.10, 0.03)
+	mi.mesh = bm
+	var mm := StandardMaterial3D.new()
+	mm.albedo_color = Color(0.25, 0.90, 0.35)
+	mm.emission_enabled = true
+	mm.emission = Color(0.18, 0.85, 0.28)
+	mm.emission_energy_multiplier = 2.4
+	mi.material_override = mm
+	mi.position = pv + Vector3(0, 0.07, 0)
+	mi.rotation.y = rng.randf() * TAU
+	world.add_child(mi)
+	var li := OmniLight3D.new()
+	li.light_color = Color(0.30, 1.0, 0.40)
+	li.light_energy = 0.35
+	li.omni_range = 1.3
+	li.position = Vector3(0, 0.16, 0)
+	mi.add_child(li)
+	piles.append([pv, mi, false])
+
+
+func _do_rewind() -> void:
+	if state != "play" or rewinding > 0.0 or rewind_cd > 0.0:
+		return
+	if battery < 12.0:
+		_toast(tt("cam_low"), 2.5)
+		play("creak", -10.0, 0.8)
+		return
+	battery = maxf(0.0, battery - 9.0)
+	rewind_cd = 7.0
+	rewinding = 1.5
+	if entity != null and is_instance_valid(entity):
+		rewind_pos = entity.position
+	if sfx_tape != null:
+		sfx_tape.play()
+	# le bruit du rembobinage l'attire
+	bait_pos = Vector2(player.position.x, player.position.z)
+	bait_timer = 3.5
+	bait_level = player_level
+	_toast(tt("cam_rewind"), 2.2)
+
+
+func _update_trail() -> void:
+	if trail.size() < 2:
+		return
+	if trail_mi == null or not is_instance_valid(trail_mi):
+		trail_mi = MeshInstance3D.new()
+		trail_mi.mesh = ImmediateMesh.new()
+		var tm := StandardMaterial3D.new()
+		tm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		tm.albedo_color = Color(0.35, 1.0, 0.45)
+		tm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		tm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		tm.no_depth_test = true
+		trail_mi.material_override = tm
+		world.add_child(trail_mi)
+	var im := trail_mi.mesh as ImmediateMesh
+	im.clear_surfaces()
+	im.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
+	for e in trail:
+		var p: Vector3 = e[1]
+		im.surface_add_vertex(Vector3(p.x, p.y + 0.10, p.z))
+	im.surface_end()
+	trail_mi.visible = true
+
+
+func _cam_update(d: float) -> void:
+	if cam_overlay == null or state != "play":
+		if cam_overlay != null:
+			cam_overlay.visible = false
+		if cam_lbl != null:
+			cam_lbl.visible = false
+		return
+	# --- lever / baisser ---
+	if battery <= 0.0:
+		cam_held = false
+		cam_sticky = false
+	var want := (cam_held or cam_sticky) and battery > 0.0 and rewinding <= 0.0
+	if want != cam_raised:
+		cam_raised = want
+		if sfx_click != null:
+			sfx_click.play()
+	cam_grade = move_toward(cam_grade, 1.0 if cam_raised else 0.0, d * 4.5)
+	# --- batterie ---
+	if cam_raised:
+		battery = maxf(0.0, battery - d * 0.62)
+		if battery <= 0.0:
+			cam_raised = false
+			cam_sticky = false
+			_toast(tt("cam_empty"), 3.2)
+			if sfx_click != null:
+				sfx_click.play()
+	if battery < 20.0:
+		lowbatt_t -= d
+		if lowbatt_t <= 0.0 and sfx_lowbatt != null:
+			sfx_lowbatt.play()
+			lowbatt_t = 7.0
+	else:
+		lowbatt_t = 1.5
+	# --- piles ---
+	for p in piles:
+		if p[2]:
+			continue
+		var pv: Vector3 = p[0]
+		if absf(player.position.y - pv.y) < 1.6 and Vector2(player.position.x - pv.x, player.position.z - pv.z).length() < 1.5:
+			p[2] = true
+			if is_instance_valid(p[1]):
+				p[1].visible = false
+			battery = minf(100.0, battery + 35.0)
+			battery_charges += 1
+			_toast(tt("cam_pile") % 35, 2.4)
+			play("chime", -5.0)
+	# --- trainee de la creature (20 s) ---
+	trail_t -= d
+	if trail_t <= 0.0:
+		trail_t = 0.1
+		if entity != null and is_instance_valid(entity):
+			trail.append([run_time, entity.position])
+			while trail.size() > 210:
+				trail.pop_front()
+	if rewind_cd > 0.0:
+		rewind_cd -= d
+	# --- rembobinage : elle est gelee, on voit ou elle est passee ---
+	if rewinding > 0.0:
+		rewinding -= d
+		_update_trail()
+		if entity != null and is_instance_valid(entity):
+			entity.position = rewind_pos
+			entity_mode = 0
+		if rewinding <= 0.0 and trail_mi != null and is_instance_valid(trail_mi):
+			trail_mi.visible = false
+	elif trail_mi != null and is_instance_valid(trail_mi):
+		trail_mi.visible = false
+	# --- marqueur rouge sur elle, visible au viseur ---
+	if entity != null and is_instance_valid(entity):
+		if ent_marker == null or not is_instance_valid(ent_marker) or ent_marker.get_parent() != entity:
+			ent_marker = MeshInstance3D.new()
+			var sm2 := SphereMesh.new()
+			sm2.radius = 0.13
+			sm2.height = 0.26
+			ent_marker.mesh = sm2
+			var mc := StandardMaterial3D.new()
+			mc.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			mc.albedo_color = Color(1.0, 0.22, 0.16, 0.75)
+			mc.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			mc.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+			mc.no_depth_test = true
+			ent_marker.material_override = mc
+			ent_marker.position = Vector3(0, 2.45, 0)
+			entity.add_child(ent_marker)
+		ent_marker.visible = cam_raised
+	# --- HUD du viseur ---
+	cam_overlay.visible = cam_grade > 0.04
+	if cam_overlay.material is ShaderMaterial:
+		var sm := cam_overlay.material as ShaderMaterial
+		sm.set_shader_parameter("fade", cam_grade)
+		sm.set_shader_parameter("vig", 0.92)
+		sm.set_shader_parameter("grain", 0.09 + (0.10 if battery < 20.0 else 0.0) + (0.40 if rewinding > 0.0 else 0.0))
+		sm.set_shader_parameter("scan", 0.10)
+		sm.set_shader_parameter("glitch", (1.0 if rewinding > 0.0 else 0.0) + (0.30 if battery < 12.0 else 0.0))
+	cam_lbl.visible = cam_grade > 0.04 and hud_on
+	if cam_lbl.visible:
+		var rec := "\u25cf" if int(Time.get_ticks_msec() / 600) % 2 == 0 else " "
+		var ts := 23 * 3600 + 10 * 60 + int(run_time)
+		var hh := int(ts / 3600) % 24
+		var mi2 := int(ts / 60) % 60
+		var ss2 := ts % 60
+		cam_lbl.text = "%s REC   HI8   31 OCT 1997   %02d:%02d:%02d   [ %s ]" % [rec, hh, mi2, ss2, tt("cam_batt") % int(battery)]
+	if batt_fill != null:
+		batt_fill.size.x = 160.0 * clampf(battery / 100.0, 0.0, 1.0)
+		batt_fill.color = Color(0.85, 0.20, 0.15, 0.9) if battery < 20.0 else Color(0.30, 0.85, 0.42, 0.85)
+
+
+func _dbg_cam(d: float) -> void:
+	if state != "play":
+		return
+	if dbg_cam_i == 0 and run_time > 4.0:
+		dbg_cam_i = 1
+		cam_sticky = true
+		print("DBG cam=raise piles=", piles.size(), " batt=", snappedf(battery, 0.1))
+	elif dbg_cam_i == 1 and run_time > 7.0:
+		dbg_cam_i = 2
+		print("DBG cam=raised overlay=", cam_overlay.visible, " grade=", snappedf(cam_grade, 0.01), " batt=", snappedf(battery, 0.1))
+		_do_rewind()
+	elif dbg_cam_i == 2 and run_time > 8.0:
+		dbg_cam_i = 3
+		print("DBG cam=rewind rew=", snappedf(rewinding, 0.01), " trail=", trail.size(), " batt=", snappedf(battery, 0.1))
+	elif dbg_cam_i == 3 and run_time > 11.0:
+		dbg_cam_i = 4
+		print("DBG cam=done batt=", snappedf(battery, 0.1), " cd=", snappedf(rewind_cd, 0.1), " pile0=", piles[0][0] if piles.size() > 0 else "none")
+		cam_sticky = false
+	elif dbg_cam_i == 4 and run_time > 13.0:
+		print("DBG cam=OK")
+		get_tree().quit(0)
