@@ -57,11 +57,11 @@ grain = grain * 0.6 + fbm((N, 256), 5, 8, 12).repeat(N // 256, axis=1) * 0.4
 seam = (np.abs((yy * PL) % 1.0 - 0.5) > 0.485).astype(np.float32)
 butt = ((np.abs((xx + row * 0.37) % 0.5) < 0.004) & (np.abs((yy * PL) % 1.0 - 0.5) < 0.48)).astype(np.float32)
 h = grain * 0.25 - seam * 1.0 - butt * 0.6
-base = 0.30 + tone[np.minimum(row.astype(int), PL)] * 0.5
+base = 0.38 + tone[np.minimum(row.astype(int), PL)] * 0.5
 alb = np.zeros((N, N, 3), np.float32)
-alb[..., 0] = (base + grain * 0.22) * 150
-alb[..., 1] = (base + grain * 0.20) * 105
-alb[..., 2] = (base + grain * 0.16) * 70
+alb[..., 0] = (base + grain * 0.22) * 205
+alb[..., 1] = (base + grain * 0.20) * 150
+alb[..., 2] = (base + grain * 0.16) * 100
 alb *= (1.0 - seam[..., None] * 0.6) * (1.0 - butt[..., None] * 0.4)
 rough = 0.62 + grain * 0.18 - fbm((N, N), 3, 4, 13) * 0.22
 ao = 1.0 - seam * 0.55 - butt * 0.3
