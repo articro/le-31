@@ -2,6 +2,8 @@
 (copier tout le bloc ci-dessous, ou simplement : « Continue LE 31 : lis /home/user/doc/MEMOIRE_LE31.md » si le workspace est partagé)
 
 ---
+RÈGLE PETITS TURNS : une seule étape par message (lire mémoire / puis reconstruire / puis audit / puis un patch + push). Voir MEMOIRE §8.
+---
 Projet actif unique : **LE 31**, jeu d'horreur Halloween en Godot 4.3, repo GitHub `articro/le-31`.
 Lis d'abord `/home/user/doc/MEMOIRE_LE31.md` (ou, si ce fichier n'existe pas chez toi : récupère https://raw.githubusercontent.com/articro/le-31-memoire/main/MEMOIRE_LE31.md — repo public, aucun token nécessaire) (mémoire complète : architecture, pièges, état GitHub) et `/home/user/doc/horreur_plan_halloween2026.md` §S9. Si ces fichiers sont absents, voici l'essentiel :
 
