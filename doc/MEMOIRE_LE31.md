@@ -90,3 +90,35 @@ Le projet « Marmite & Monstres » est ABANDONNÉ par l'utilisateur : ne JAMAIS 
   Les captures de validation sont faites par l'utilisateur (GPU Arc A750) ou via `--dbg=shot` chez lui.
 - Piège nouveau : `pkill -x Godot_v4.3-...` ne matche PAS (comm tronqué à 15 car.) → utiliser
   `pkill -f "[G]odot_v4.3-stable"` (le crochet évite de tuer son propre shell).
+
+## 9. v12 « ÉLARGIE » (2026-10-05, session Arena 2, après retour utilisateur)
+- **Flèche au sol supprimée** (`ghost_arrow = null`, plus de suivi par frame) + textes i18n mis à jour.
+- **Lampe recalculée** : energy 9 -> 4.6, range 18 -> 13, angle 50 -> 42 ; poussière 90 -> 55.
+- **ESCALIER : vrai bug trouvé**. Base de la volée à z=13.6 avec mur sud à z=14 => joueur écrasé contre
+  le mur, zone de déclenchement (13.1-13.85) inatteignable. L'audit **téléportait** le joueur dedans
+  (angle mort du test !). Correctif : volée reculée de 1.2 m (base 12.4), rampe/rails/trémie -1.2,
+  `RAMP_RECT` -> z 7.4-12.5, nœuds IA ajustés (13 -> 12.9), **déclencheurs larges sans condition `mv.z`**
+  (x 0.65-2.4 ; z 12.4-13.95 et 6.6-8.3) + `stair_cd` anti-rebond + toasts.
+- **MAISON ÉLARGIE** : couloir z 5.8-8.2 -> **z 5.0-9.0 (2.4 -> 4.0 m)**. Tous murs/portes/piliers/
+  cloisons/waypoints BFS (_edge_door)/dalles de plafond recalculés (dalles : 14.0/6.9/5.9 au lieu de
+  14.0/8.3/4.8). Meubles et spots déplacés (canapé 4.3, citrouille 9.9, KEY_SPOTS_A[2] -> (9.8,7.2),
+  HIDE_SPOTS[1] -> (15.8,9.7), HIDE_SPOTS[2] -> (3.0,9.9), affiches z 4.93/9.07).
+- **SCREAMER refait** : `assets/tex/screamer.png` (1280x853, généré), `flash_rect` rouge + secousse +
+  zoom `scare_t` (0.6 s de décroissance), son `scare` doublé (+3 / -1 dB désaccordé) + `sting`,
+  durée 0.55 -> 1.6 s (mort) et 0.95 s (respawn).
+- **Monstre encore détaillé** : genoux, chevilles, 4 orteils/pied, 5 côtes, 6 vertèbres, clavicules,
+  tendons de cou, 7 mèches de cheveux (en plus de l'existant). Aperçu `doc/art/monstre_v10_vs_v11.png`.
+- **NOUVEAU accroupissement (C)** : vitesse 1.7, bruit 0.07 (au lieu de 0.18), caméra -0.42, pas -19 dB.
+- **NOUVEAU 5 notes** (`NOTE_SPOTS`, `taken_notes`, `note_meshes`) : garage, salon, cuisine, chambre 2,
+  étage ; toast lore + whisper ; compteur HUD « NOTES n/5 ».
+- Validation : **AUDIT ALL OK (122 bodies)** ; bot quiet seed 5 = **WIN (1 prise)**.
+- **PLAFOND DE SNAPSHOT** : workspace passé à 241 Mo => nettoyage obligatoire. Règle : garder
+  `/home/user` < ~110 Mo. Supprimés : `uploads/` (captures déjà copiées), doublons d'images, `.godot`
+  (régénérable par `--import`, 47 Mo). Le **zip projet se construit à la demande** :
+  `bash /home/user/MAKE_ZIP_V12.sh` puis `bash /home/user/push_v12.sh <PAT>`.
+- **Piège** : ne JAMAIS écrire un motif de kill (`pkill -f`, `pgrep -f`) dans la même commande que le
+  chemin complet du binaire Godot — le motif matche la propre ligne de commande du shell et le tue.
+  Utiliser `pkill -x Godot_v4.3-stab` (nom de process tronqué à 15 car.).
+- **Props IA** : guide + 4 images prêtes (`doc/PROPS_IA_GUIDE.md`, `doc/props_ia/` : TV CRT, horloge,
+  poupée, table). Space gratuit : huggingface.co/spaces/microsoft/TRELLIS.2 (MIT) ou
+  stabilityai/TripoSR. JAMAIS Hunyuan3D-2 (licence hors UE). Monstre = procédural (décision v12).

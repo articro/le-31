@@ -89,8 +89,16 @@ const TR := {
 		"opt_vhs": "Grain VHS",
 		"opt_back": "RETOUR",
 		"back": "RETOUR",
-		"toast_arrow": "Suis la flèche orange au sol : elle montre le chemin (1er tour uniquement).",
-		"obj_short": "suis la flèche au sol vers la porte EST · sortie VERROUILLÉE : trouve la clé dorée · marche doucement · E = bonbon · F = piège collant",
+		"toast_arrow": "Trouve la clé dorée : elle brille quelque part dans la maison.",
+		"crouch_on": "Accroupi : tu fais presque aucun bruit (C pour te relever)",
+		"crouch_off": "Debout",
+		"notes": "NOTES %d/5",
+		"note_1": "NOTE 1/5 : « 31 octobre 1997. Elle est revenue. Ne cours pas : elle entend le sol. »",
+		"note_2": "NOTE 2/5 : « Le sucre l'attire. J'en ai collé partout dans la cuisine. »",
+		"note_3": "NOTE 3/5 : « La clé dorée change de place chaque nuit. Je l'ai vue à l'étage. »",
+		"note_4": "NOTE 4/5 : « Si tu l'entends renifler, accroupis-toi. Elle ne voit rien du tout. »",
+		"note_5": "NOTE 5/5 : « Si tu lis ceci, on se retrouve dehors. Cours. »",
+		"obj_short": "porte EST VERROUILLÉE : trouve la clé dorée · marche doucement · C = s'accroupir · E = bonbon · F = piège collant",
 		"how_go": "C'EST PARTI",
 		"candy_title": "BONBON MAUDIT GAGNÉ — choisis : ",
 		"candy_got": "Tu gardes : %s",
@@ -190,8 +198,16 @@ const TR := {
 		"opt_vhs": "VHS grain",
 		"opt_back": "BACK",
 		"back": "BACK",
-		"toast_arrow": "Follow the orange arrow on the floor: it shows the way (first lap only).",
-		"obj_short": "nothing changed → walk through · changed → turn back · 5 → exit",
+		"toast_arrow": "Find the golden key: it glows somewhere in the house.",
+		"crouch_on": "Crouching: you make almost no sound (C to stand up)",
+		"crouch_off": "Standing",
+		"notes": "NOTES %d/5",
+		"note_1": "NOTE 1/5: \"October 31, 1997. She is back. Don't run: she hears the floor.\"",
+		"note_2": "NOTE 2/5: \"Sugar lures her. I glued it all over the kitchen.\"",
+		"note_3": "NOTE 3/5: \"The golden key moves every night. I saw it upstairs.\"",
+		"note_4": "NOTE 4/5: \"If you hear her sniffing, crouch. She sees nothing at all.\"",
+		"note_5": "NOTE 5/5: \"If you read this, meet me outside. Run.\"",
+		"obj_short": "EAST door LOCKED: find the golden key · walk softly · C = crouch · E = candy · F = sticky trap",
 		"how_go": "LET'S GO",
 		"candy_title": "CURSED CANDY EARNED — pick: ",
 		"candy_got": "You keep: %s",
@@ -233,6 +249,12 @@ var ui: CanvasLayer
 var vhs: ColorRect
 var fade: ColorRect
 var scare_rect: TextureRect
+var flash_rect: ColorRect
+var scare_t := 0.0
+var crouch := false
+var notes_found := 0
+var taken_notes := [false, false, false, false, false]
+var note_meshes: Array = []
 var title_ctl: Control
 var end_ctl: Control
 var pause_ctl: Control
@@ -495,11 +517,11 @@ const WALL_H := 2.9
 const WALL_T := 0.3
 var spawn_pos := Vector2(1.2, 7.0)
 var exit_pos := Vector2(19.7, 7.0)
-const NODES := [Vector2(2, 7), Vector2(10, 7), Vector2(17.5, 7), Vector2(3.5, 3), Vector2(10, 2.8), Vector2(16.5, 3), Vector2(4.5, 9.3), Vector2(8, 11), Vector2(12.5, 11), Vector2(17.5, 11), Vector2(1.5, 7.6), Vector2(9.0, 5.0), Vector2(16.0, 7.0), Vector2(1.5, 13.2)]
+const NODES := [Vector2(2, 7), Vector2(10, 7), Vector2(17.5, 7), Vector2(3.5, 3), Vector2(10, 2.8), Vector2(16.5, 3), Vector2(4.5, 9.3), Vector2(8, 11), Vector2(12.5, 11), Vector2(17.5, 11), Vector2(1.5, 7.5), Vector2(9.0, 5.0), Vector2(16.0, 7.0), Vector2(1.5, 12.9)]
 const EDGES := [[0, 1], [1, 2], [0, 3], [1, 4], [2, 5], [0, 6], [1, 7], [1, 8], [2, 9], [6, 13], [13, 10], [10, 11], [10, 12]]
 const NODE_LVL := [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0]
 const LEVEL_Y := [0.0, 2.98]
-const RAMP_RECT := [Vector2(0.9, 8.5), Vector2(2.1, 13.7)]
+const RAMP_RECT := [Vector2(0.9, 7.4), Vector2(2.1, 12.5)]
 const CANDY_SPOTS := [Vector3(9.5, 0, 3.5), Vector3(2.2, 0, 1.2), Vector3(14, 0, 13), Vector3(1.2, 0, 12.5), Vector3(16.2, 2.98, 11.5)]
 const CREEK_ZONES := [Vector3(5.5, 6.1, 0.6), Vector3(12.0, 7.9, 0.6), Vector3(10.3, 4.4, 0.6), Vector3(2.6, 2.2, 0.6), Vector3(13.4, 12.2, 0.6)]
 var creek_cd := [0.0, 0.0, 0.0, 0.0, 0.0]
@@ -541,13 +563,15 @@ var bot_level := 0
 var dbg_stuck_t := 0.0
 var dbg_move_frames := 0
 var stair_t := -1.0
+var stair_cd := 0.0
 var stair_dir := 1
 var dbg_move_dir := Vector2.ZERO
 var dbg_last_pos := Vector2.ZERO
 var dbg_jdir := 1.0
-const KEY_SPOTS_A := [Vector3(16.9, 0, 3.4), Vector3(3.9, 0, 3.4), Vector3(9.8, 0, 8.9), Vector3(15.8, 2.98, 3.0)]
+const KEY_SPOTS_A := [Vector3(16.9, 0, 3.4), Vector3(3.9, 0, 3.4), Vector3(9.8, 0, 7.2), Vector3(15.8, 2.98, 3.0)]
 const KEY_SPOTS_B := [Vector3(2.6, 0, 7.4), Vector3(11.2, 0, 2.4), Vector3(17.9, 0, 7.4), Vector3(6.5, 2.98, 2.5)]
-const HIDE_SPOTS := [Vector3(8.0, 0, 12.6), Vector3(15.8, 0, 9.0), Vector3(3.0, 0, 9.0), Vector3(18.8, 2.98, 2.2)]
+const NOTE_SPOTS := [Vector3(4.7, 0, 13.3), Vector3(2.2, 0, 2.2), Vector3(11.0, 0, 2.0), Vector3(9.0, 0, 12.6), Vector3(15.6, 2.98, 3.4)]
+const HIDE_SPOTS := [Vector3(8.0, 0, 12.6), Vector3(15.8, 0, 9.7), Vector3(3.0, 0, 9.9), Vector3(18.8, 2.98, 2.2)]
 const SPAWN_POINTS := [Vector2(1.2, 7.0), Vector2(2.0, 2.0), Vector2(11.5, 2.2)]
 var dbg_path: Array = []
 var shot_i := 0
@@ -572,7 +596,7 @@ func _node_of(p: Vector2, lvl := -1) -> int:
 
 func _terrain_y(p: Vector2, lvl: int) -> float:
 	if p.x >= RAMP_RECT[0].x and p.x <= RAMP_RECT[1].x and p.y >= RAMP_RECT[0].y and p.y <= RAMP_RECT[1].y:
-		var idx := int(floor((13.7 - p.y) / 0.2146))
+		var idx := int(floor((12.4 - p.y) / 0.2146))
 		return clampf(idx * 0.124, 0.0, 2.98)
 	return LEVEL_Y[lvl]
 
@@ -696,14 +720,14 @@ func _build_house() -> void:
 	var tilem := _pixel("res://assets/tex/tile.png")
 	tilem.roughness = 0.35
 	# sols
-	_room_floor(0, 5.8, 20, 8.2, fw)
-	_room_floor(0, 0, 7, 5.8, fw)
-	_room_floor(7, 0, 13, 5.8, tilem)
-	_room_floor(13, 0, 20, 5.8, tilem)
-	_room_floor(0, 8.2, 6, 14, tilem)
-	_room_floor(6, 8.2, 10, 14, fw)
-	_room_floor(10, 8.2, 15, 14, fw)
-	_room_floor(15, 8.2, 20, 14, fw)
+	_room_floor(0, 5.0, 20, 9.0, fw)
+	_room_floor(0, 0, 7, 5.0, fw)
+	_room_floor(7, 0, 13, 5.0, tilem)
+	_room_floor(13, 0, 20, 5.0, tilem)
+	_room_floor(0, 9.0, 6, 14, tilem)
+	_room_floor(6, 9.0, 10, 14, fw)
+	_room_floor(10, 9.0, 15, 14, fw)
+	_room_floor(15, 9.0, 20, 14, fw)
 # plafond : assuré par la dalle de l'étage (boîtes 2.82-2.98), trémie de l'escalier laissée ouverte.
 # (l'ancien quad de plafond était un mur fantôme vertical qui coupait la maison en deux)
 	# murs extérieurs (ouverture sortie est z 6.4-7.6)
@@ -712,19 +736,19 @@ func _build_house() -> void:
 	_wall_seg(0, 0, 0, 14)
 	_wall_seg(20, 0, 20, 6.2)
 	_wall_seg(20, 7.8, 20, 14)
-	# mur nord intérieur z=5.8 (3 portes larges 1.6 m)
-	_wall_seg(0, 5.8, 2.75, 5.8)
-	_wall_seg(4.35, 5.8, 9.25, 5.8)
-	_wall_seg(10.85, 5.8, 15.75, 5.8)
-	_wall_seg(17.35, 5.8, 20, 5.8)
-	# mur sud intérieur z=8.2 (4 portes larges 1.6 m)
-	_wall_seg(0, 8.2, 2.25, 8.2)
-	_wall_seg(3.85, 8.2, 7.25, 8.2)
-	_wall_seg(8.85, 8.2, 11.75, 8.2)
-	_wall_seg(13.35, 8.2, 16.75, 8.2)
-	_wall_seg(18.35, 8.2, 20, 8.2)
+	# mur nord intérieur z=5.0 (3 portes larges 1.6 m)
+	_wall_seg(0, 5.0, 2.75, 5.0)
+	_wall_seg(4.35, 5.0, 9.25, 5.0)
+	_wall_seg(10.85, 5.0, 15.75, 5.0)
+	_wall_seg(17.35, 5.0, 20, 5.0)
+	# mur sud intérieur z=9.0 (4 portes larges 1.6 m)
+	_wall_seg(0, 9.0, 2.25, 9.0)
+	_wall_seg(3.85, 9.0, 7.25, 9.0)
+	_wall_seg(8.85, 9.0, 11.75, 9.0)
+	_wall_seg(13.35, 9.0, 16.75, 9.0)
+	_wall_seg(18.35, 9.0, 20, 9.0)
 	# piliers de jonction : plus aucun trou aux raccords
-	for jp in [Vector2(0, 0), Vector2(20, 0), Vector2(0, 14), Vector2(20, 14), Vector2(0, 5.8), Vector2(20, 5.8), Vector2(0, 8.2), Vector2(20, 8.2), Vector2(7, 0), Vector2(13, 0), Vector2(7, 5.8), Vector2(13, 5.8), Vector2(6, 14), Vector2(10, 14), Vector2(15, 14), Vector2(6, 8.2), Vector2(10, 8.2), Vector2(15, 8.2)]:
+	for jp in [Vector2(0, 0), Vector2(20, 0), Vector2(0, 14), Vector2(20, 14), Vector2(0, 5.0), Vector2(20, 5.0), Vector2(0, 9.0), Vector2(20, 9.0), Vector2(7, 0), Vector2(13, 0), Vector2(7, 5.0), Vector2(13, 5.0), Vector2(6, 14), Vector2(10, 14), Vector2(15, 14), Vector2(6, 9.0), Vector2(10, 9.0), Vector2(15, 9.0)]:
 		var pil := _box(Vector3(0.42, WALL_H, 0.42), _pbr("wall"))
 		pil.position = Vector3(jp.x, WALL_H / 2.0, jp.y)
 		world.add_child(pil)
@@ -737,19 +761,19 @@ func _build_house() -> void:
 		pcol.position = Vector3(jp.x, WALL_H / 2.0, jp.y)
 		world.add_child(pcol)
 	# cloisons
-	_wall_seg(7, 0, 7, 5.8)
-	_wall_seg(13, 0, 13, 5.8)
-	_wall_seg(6, 8.2, 6, 14)
-	_wall_seg(10, 8.2, 10, 14)
-	_wall_seg(15, 8.2, 15, 14)
+	_wall_seg(7, 0, 7, 5.0)
+	_wall_seg(13, 0, 13, 5.0)
+	_wall_seg(6, 9.0, 6, 14)
+	_wall_seg(10, 9.0, 10, 14)
+	_wall_seg(15, 9.0, 15, 14)
 	# panneaux de porte entrebâillés (solides) dans chaque ouverture
-	_door_panel(Vector2(3.55, 5.8), 1.0)
-	_door_panel(Vector2(10.05, 5.8), -1.0)
-	_door_panel(Vector2(16.55, 5.8), 1.0)
-	_door_panel(Vector2(3.05, 8.2), -1.0)
-	_door_panel(Vector2(8.05, 8.2), 1.0)
+	_door_panel(Vector2(3.55, 5.0), 1.0)
+	_door_panel(Vector2(10.05, 5.0), -1.0)
+	_door_panel(Vector2(16.55, 5.0), 1.0)
+	_door_panel(Vector2(3.05, 9.0), -1.0)
+	_door_panel(Vector2(8.05, 9.0), 1.0)
 	var c1d := _box(Vector3(1.6, 2.1, 0.09), _pbr("door"))
-	c1d.position = Vector3(12.55, 1.05, 8.2)
+	c1d.position = Vector3(12.55, 1.05, 9.0)
 	world.add_child(c1d)
 	ch1_door_node = c1d
 	ch1_col = StaticBody3D.new()
@@ -758,16 +782,16 @@ func _build_house() -> void:
 	c1bs.size = Vector3(1.6, 2.1, 0.12)
 	c1cs.shape = c1bs
 	ch1_col.add_child(c1cs)
-	ch1_col.position = Vector3(12.55, 1.05, 8.2)
+	ch1_col.position = Vector3(12.55, 1.05, 9.0)
 	world.add_child(ch1_col)
 	var c1k := _box(Vector3(0.06, 0.06, 0.03), _simple(Color(0.5, 0.4, 0.15), 0.3, 0.9))
-	c1k.position = Vector3(13.1, 1.05, 8.27)
+	c1k.position = Vector3(13.1, 1.05, 9.07)
 	world.add_child(c1k)
-	_door_panel(Vector2(17.55, 8.2), 1.0)
+	_door_panel(Vector2(17.55, 9.0), 1.0)
 	# meubles salon
 	var woodm := _pbr("door")
 	var cloth := _simple(Color(0.25, 0.12, 0.10), 0.9)
-	_furn(Vector3(2.2, 0.8, 0.9), Vector3(2.0, 0.4, 4.6), cloth)
+	_furn(Vector3(2.2, 0.8, 0.9), Vector3(2.0, 0.4, 4.3), cloth)
 	_furn(Vector3(1.4, 0.5, 0.8), Vector3(4.3, 0.25, 2.6), woodm)
 	_furn(Vector3(0.5, 1.8, 3.0), Vector3(0.45, 0.9, 2.6), woodm)
 	# cuisine
@@ -790,23 +814,23 @@ func _build_house() -> void:
 	var ramp_len := sqrt(5.15 * 5.15 + 2.98 * 2.98)
 	var ramp_ang := atan2(2.98, 5.15)
 	var ramp := _box(Vector3(1.2, 0.16, ramp_len), woodm)
-	ramp.position = Vector3(1.5, 1.49, 11.12)
+	ramp.position = Vector3(1.5, 1.49, 9.92)
 	ramp.rotation = Vector3(ramp_ang, 0, 0)
 	world.add_child(ramp)
 	for st in range(24):
-		var scz := 13.6 - st * 0.2146
+		var scz := 12.4 - st * 0.2146
 		var scy := (st + 1) * 0.124 - 0.062
 		_furn(Vector3(1.2, 0.124, 0.26), Vector3(1.5, scy, scz), woodm)
 	for rx in [0.92, 2.08]:
 		var rail := _box(Vector3(0.06, 0.5, ramp_len), woodm)
-		rail.position = Vector3(rx, 1.49 + 0.42, 11.12)
+		rail.position = Vector3(rx, 1.49 + 0.42, 9.92)
 		rail.rotation = Vector3(ramp_ang, 0, 0)
 		world.add_child(rail)
 	# dalle de l'étage (trémie au-dessus de la rampe) + murs hauts + toit
 	var slabm := _pbr("ceil")
-	for sp in [Vector3(0.4, 2.9, 7.0), Vector3(11.1, 2.9, 7.0), Vector3(1.5, 2.9, 4.15), Vector3(1.5, 2.9, 11.6)]:
+	for sp in [Vector3(0.4, 2.9, 7.0), Vector3(11.1, 2.9, 7.0), Vector3(1.5, 2.9, 3.45), Vector3(1.5, 2.9, 11.05)]:
 		var sw := 0.8 if sp.x < 1 else (17.8 if sp.x > 10 else 1.4)
-		var sd2 := 14.0 if sp.z == 7.0 else (8.3 if sp.z < 7 else 4.8)
+		var sd2 := 14.0 if sp.z == 7.0 else (6.9 if sp.z < 7 else 5.9)
 		var sl := _box(Vector3(sw, 0.16, sd2), slabm)
 		sl.position = Vector3(sp.x, sp.y, sp.z)
 		world.add_child(sl)
@@ -957,7 +981,7 @@ func _build_house() -> void:
 		web.position = cw
 		world.add_child(web)
 	dyn.add_child(_make_pumpkin(Vector3(4.8, 0, 1.8), 0.7))
-	dyn.add_child(_make_pumpkin(Vector3(11.2, 0, 9.2), 0.6))
+	dyn.add_child(_make_pumpkin(Vector3(11.2, 0, 9.9), 0.6))
 	dyn.add_child(_make_pumpkin(Vector3(18.2, 0, 10.8), 0.8))
 	# lattes fatiguées (zones qui grincent) : visibles au sol
 	var dark_plank := _simple(Color(0.10, 0.062, 0.04), 0.9)
@@ -974,8 +998,17 @@ func _build_house() -> void:
 		cm.position = Vector3(CANDY_SPOTS[ci].x, CANDY_SPOTS[ci].y + 0.95, CANDY_SPOTS[ci].z)
 		world.add_child(cm)
 		candy_meshes.append(cm)
+	# v12 : 5 notes à trouver (lore)
+	note_meshes.clear()
+	var paperm := _simple(Color(0.90, 0.88, 0.80), 0.55)
+	for ni in range(NOTE_SPOTS.size()):
+		var npp := _box(Vector3(0.24, 0.012, 0.32), paperm)
+		npp.position = Vector3(NOTE_SPOTS[ni].x, NOTE_SPOTS[ni].y + 0.02, NOTE_SPOTS[ni].z)
+		npp.rotation = Vector3(0, 0.4 * float(ni), 0)
+		world.add_child(npp)
+		note_meshes.append(npp)
 	# affiches
-	for pp in [[Vector2(5.0, 5.75), 0], [Vector2(14.0, 8.25), PI], [Vector2(9.95, 0.05), 0]]:
+	for pp in [[Vector2(5.0, 4.93), 0], [Vector2(14.0, 9.07), PI], [Vector2(9.95, 0.05), 0]]:
 		var po := _make_poster_xy(pp[0], pp[1])
 		world.add_child(po)
 
@@ -1144,13 +1177,39 @@ func _make_entity() -> Node3D:
 		shin.position = Vector3(0, -0.74, 0.03)
 		shin.rotation.x = 0.10
 		legp.add_child(shin)
+		var knee := MeshInstance3D.new()
+		var km2 := SphereMesh.new()
+		km2.radius = 0.058
+		km2.height = 0.116
+		knee.mesh = km2
+		knee.material_override = skin
+		knee.position = Vector3(0, -0.50, 0.01)
+		legp.add_child(knee)
+		var ankle := MeshInstance3D.new()
+		var am2 := SphereMesh.new()
+		am2.radius = 0.038
+		am2.height = 0.076
+		ankle.mesh = am2
+		ankle.material_override = skin
+		ankle.position = Vector3(0, -0.965, 0.02)
+		legp.add_child(ankle)
 		var foot := MeshInstance3D.new()
 		var fm2 := BoxMesh.new()
-		fm2.size = Vector3(0.085, 0.05, 0.15)
+		fm2.size = Vector3(0.075, 0.045, 0.12)
 		foot.mesh = fm2
 		foot.material_override = skin
-		foot.position = Vector3(0, -1.01, -0.06)
+		foot.position = Vector3(0, -1.012, -0.045)
 		legp.add_child(foot)
+		for tz in range(4):
+			var toe := MeshInstance3D.new()
+			var tzm := CapsuleMesh.new()
+			tzm.radius = 0.011
+			tzm.height = 0.055
+			toe.mesh = tzm
+			toe.material_override = skin
+			toe.position = Vector3(-0.024 + tz * 0.016, -1.03, -0.112)
+			toe.rotation.x = PI / 2
+			legp.add_child(toe)
 		nd.add_child(legp)
 	var pelvis := MeshInstance3D.new()
 	var pvm := CylinderMesh.new()
@@ -1198,6 +1257,45 @@ func _make_entity() -> Node3D:
 	hump.scale = Vector3(1.15, 0.85, 1.0)
 	hump.position = Vector3(0, 1.88, 0.11)
 	nd.add_child(hump)
+	for rb in range(5):
+		var rib := MeshInstance3D.new()
+		var rbm := CapsuleMesh.new()
+		rbm.radius = 0.016
+		rbm.height = 0.30 - rb * 0.02
+		rib.mesh = rbm
+		rib.material_override = skin
+		rib.position = Vector3(0, 1.60 + rb * 0.085, -0.125 + rb * 0.012)
+		rib.rotation = Vector3(PI / 2, 0, 0)
+		rib.scale = Vector3(1.0, 1.0, 0.55)
+		nd.add_child(rib)
+	for sk2 in range(6):
+		var spin := MeshInstance3D.new()
+		var skm := SphereMesh.new()
+		skm.radius = 0.022
+		skm.height = 0.044
+		spin.mesh = skm
+		spin.material_override = skin
+		spin.position = Vector3(0, 1.50 + sk2 * 0.10, 0.105 + sk2 * 0.008)
+		nd.add_child(spin)
+	for cb in [-1.0, 1.0]:
+		var clb := MeshInstance3D.new()
+		var clm := CapsuleMesh.new()
+		clm.radius = 0.016
+		clm.height = 0.22
+		clb.mesh = clm
+		clb.material_override = skin
+		clb.position = Vector3(cb * 0.13, 1.90, -0.06)
+		clb.rotation = Vector3(0, 0, PI / 2 - cb * 0.35)
+		nd.add_child(clb)
+		var tendon := MeshInstance3D.new()
+		var tdm := CapsuleMesh.new()
+		tdm.radius = 0.015
+		tdm.height = 0.16
+		tendon.mesh = tdm
+		tendon.material_override = skin
+		tendon.position = Vector3(cb * 0.05, 2.02, -0.03)
+		tendon.rotation = Vector3(0.1, 0, cb * 0.18)
+		nd.add_child(tendon)
 	for sxs in [-1.0, 1.0]:
 		var sh := MeshInstance3D.new()
 		var shm := SphereMesh.new()
@@ -1254,6 +1352,15 @@ func _make_entity() -> Node3D:
 	skull.material_override = skin
 	skull.scale = Vector3(0.95, 1.05, 1.05)
 	head.add_child(skull)
+	for hx in range(7):
+		var hair := MeshInstance3D.new()
+		var hm2 := BoxMesh.new()
+		hm2.size = Vector3(0.008, 0.10 + 0.05 * float(hx % 3), 0.008)
+		hair.mesh = hm2
+		hair.material_override = bone
+		hair.position = Vector3(-0.055 + hx * 0.018, 0.155, -0.03 + 0.012 * float(hx % 2))
+		hair.rotation = Vector3(-0.25 - 0.1 * float(hx % 2), 0, 0.1 * float(hx % 3 - 1))
+		head.add_child(hair)
 	var brow := MeshInstance3D.new()
 	var browm := BoxMesh.new()
 	browm.size = Vector3(0.24, 0.045, 0.055)
@@ -1380,10 +1487,9 @@ func _draw_loop() -> void:
 	ma.emission_enabled = true
 	ma.emission = Color(1.0, 0.55, 0.15)
 	ma.emission_texture = ma.albedo_texture
-	ma.emission_energy = 1.2
 	ma.cull_mode = StandardMaterial3D.CULL_DISABLED
-	ghost_arrow = _quad(Vector2(0.8, 0.8), ma)
-	dyn.add_child(ghost_arrow)
+	# v12 : la flèche qui suivait le joueur est SUPPRIMÉE (demande utilisateur)
+	ghost_arrow = null
 	var gold := _emissive(Color(1.0, 0.8, 0.2), 2.2, "")
 	var krm := TorusMesh.new()
 	krm.inner_radius = 0.03
@@ -1429,13 +1535,13 @@ func _neighbors(i: int) -> Array:
 func _edge_door(a: int, b: int) -> Vector2:
 	var k := mini(a, b) * 100 + maxi(a, b)
 	match k:
-		3: return Vector2(3.55, 5.8)
-		104: return Vector2(10.05, 5.8)
-		205: return Vector2(16.55, 5.8)
-		6: return Vector2(3.05, 8.2)
-		107: return Vector2(8.05, 8.2)
-		108: return Vector2(12.55, 8.2)
-		209: return Vector2(17.55, 8.2)
+		3: return Vector2(3.55, 5.0)
+		104: return Vector2(10.05, 5.0)
+		205: return Vector2(16.55, 5.0)
+		6: return Vector2(3.05, 9.0)
+		107: return Vector2(8.05, 9.0)
+		108: return Vector2(12.55, 9.0)
+		209: return Vector2(17.55, 9.0)
 	return Vector2(-1, -1)
 
 
@@ -1513,15 +1619,15 @@ func _build_player() -> void:
 	cam.fov = 78
 	player.add_child(cam)
 	headlamp = SpotLight3D.new()
-	headlamp.light_color = Color(1.0, 0.86, 0.66)
-	headlamp.light_energy = 9.0
-	headlamp.spot_range = 18.0
-	headlamp.spot_angle = 50.0
+	headlamp.light_color = Color(1.0, 0.88, 0.70)
+	headlamp.light_energy = 4.6      # v12 : 9.0 -> 4.6 (trop puissante)
+	headlamp.spot_range = 13.0       # v12 : 18 -> 13 (elle portait trop loin)
+	headlamp.spot_angle = 42.0       # v12 : 50 -> 42 (faisceau plus serré)
 	headlamp.shadow_enabled = false
 	headlamp.position = Vector3(0, -0.05, 0)
 	cam.add_child(headlamp)
 	dust = GPUParticles3D.new()
-	dust.amount = 90
+	dust.amount = 55
 	dust.lifetime = 6.0
 	var pm := ParticleProcessMaterial.new()
 	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
@@ -2149,13 +2255,19 @@ void fragment() {
 	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cl.add_child(fade)
 	scare_rect = TextureRect.new()
-	scare_rect.texture = load("res://assets/tex/face.png")
+	scare_rect.texture = load("res://assets/tex/screamer.png")
 	scare_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	scare_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	scare_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	scare_rect.visible = false
 	scare_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cl.add_child(scare_rect)
+	flash_rect = ColorRect.new()
+	flash_rect.color = Color(0.9, 0.06, 0.06, 0.0)
+	flash_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	flash_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flash_rect.visible = false
+	cl.add_child(flash_rect)
 	vhs.visible = vhs_visible_pref
 
 
@@ -2176,6 +2288,10 @@ func _begin_run() -> void:
 	intro_ctl.visible = false
 	pause_ctl.visible = false
 	end_ctl.visible = false
+	scare_rect.modulate = Color(1, 1, 1, 1)
+	scare_rect.visible = false
+	flash_rect.visible = false
+	crouch = false
 	ts_lbl.visible = true
 	run_time = 0.0
 	progress = 0
@@ -2233,7 +2349,7 @@ func _begin_run() -> void:
 	obj_lbl.visible = hud_on
 	if not f_arrow:
 		f_arrow = true
-		_toast(tt("toast_arrow"), 7.0)
+		_toast(tt("toast_arrow"), 7.0)  # v12 : rappel clé dorée, plus de flèche
 	if dbg != "":
 		print("EVT start lang=", lang)
 	hint_lbl.text = tt("rules_tip")
@@ -2337,15 +2453,28 @@ func _caught() -> void:
 		print("DIAG caught player=", Vector2(player.position.x, player.position.z), " ent=", Vector2(entity.position.x, entity.position.z), " mode=", entity_mode, " noise=", noise, " chase_t=", chase_t, " ent_node=", entity_target, " t=", run_time)
 	if dbg != "":
 		print("EVT CAUGHT n=", catches)
-	play("scare", 0.0)
+	play("scare", 3.0)
+	play("scare", -1.0, 0.78)
+	play("sting", -1.0)
 	scare_rect.visible = true
+	scare_rect.move_to_front()
+	flash_rect.visible = true
+	flash_rect.move_to_front()
+	scare_t = 0.001
+	flash_rect.color = Color(0.95, 0.05, 0.05, 0.55)
 	if catches >= 3:
 		state = "dead"
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		var tw := create_tween()
-		tw.tween_interval(0.75)
+		tw.tween_interval(1.6)
 		tw.tween_callback(func():
-			scare_rect.visible = false
+			flash_rect.visible = false
+			scare_t = 0.0
+			scare_rect.position = Vector2.ZERO
+			scare_rect.scale = Vector2.ONE
+			# v12 : le screamer reste en FOND de l'écran de fin (assombri), comme dans les jeux d'horreur
+			scare_rect.modulate = Color(1, 1, 1, 0.26)
+			scare_rect.visible = true
 			end_ctl.visible = true
 			end_ctl.get_node("Title").text = tt("dead")
 			end_ctl.get_node("Title").add_theme_color_override("font_color", Color(0.85, 0.15, 0.12))
@@ -2355,9 +2484,15 @@ func _caught() -> void:
 		return
 	locked = true
 	var tw2 := create_tween()
-	tw2.tween_interval(0.55)
+	tw2.tween_interval(0.95)
 	tw2.tween_callback(func():
 		scare_rect.visible = false
+		scare_rect.modulate = Color(1, 1, 1, 1)
+		flash_rect.visible = false
+		scare_rect.position = Vector2.ZERO
+		scare_rect.scale = Vector2.ONE
+		scare_t = 0.0
+		crouch = false
 		_respawn_at(spawn_pos)
 		yaw = 1.5708
 		entity_mode = 0
@@ -2455,6 +2590,9 @@ func _unhandled_input(ev: InputEvent) -> void:
 				vhs_visible_pref = vhs.visible
 				options_ctl.get_node("Cvhs").button_pressed = vhs.visible
 				_save_settings()
+			if ev.keycode == KEY_C:
+				crouch = not crouch
+				_toast(tt("crouch_on") if crouch else tt("crouch_off"), 1.8)
 			if ev.keycode == KEY_G:
 				headlamp_on = not headlamp_on
 				headlamp.visible = headlamp_on
@@ -2575,7 +2713,7 @@ func _process(d: float) -> void:
 		yaw += 1.8 * d
 	if Input.is_key_pressed(KEY_RIGHT):
 		yaw -= 1.8 * d
-	var want_sprint := Input.is_key_pressed(KEY_SHIFT) and stamina > 0.05
+	var want_sprint := Input.is_key_pressed(KEY_SHIFT) and stamina > 0.05 and not crouch
 	if dbg_move_frames > 0:
 		mv = Vector3(dbg_move_dir.x, 0, dbg_move_dir.y)
 		dbg_move_frames -= 1
@@ -2584,12 +2722,12 @@ func _process(d: float) -> void:
 			stamina = maxf(0.0, stamina - d * (0.11 if candies.get("sucre", false) else 0.22))
 		else:
 			stamina = minf(1.0, stamina + d * 0.16)
-		mv = mv.normalized() * (5.6 if want_sprint else 3.4)
+		mv = mv.normalized() * (1.7 if crouch else (5.6 if want_sprint else 3.4))
 		cam.fov = lerpf(cam.fov, 78.0 + (5.0 if want_sprint else 0.0) + (1.5 if stamina < 0.2 else 0.0), 0.1)
 		player.velocity = Vector3(mv.x, 0, mv.z)
 		bob += d * (9.5 if want_sprint else 6.5)
 		if fmod(bob, TAU) < d * (9.5 if want_sprint else 6.5):
-			play("step", -12.0, randf_range(0.9, 1.1))
+			play("step", -19.0 if crouch else -12.0, randf_range(0.9, 1.1))
 	else:
 		player.velocity = Vector3.ZERO
 		bob = move_toward(bob, round(bob / TAU) * TAU, d * 4)
@@ -2597,13 +2735,18 @@ func _process(d: float) -> void:
 	player.rotation = Vector3(0, yaw, 0)
 	var skip_move := false
 	var pp2 := Vector2(player.position.x, player.position.z)
-	if stair_t < 0.0:
-		if pp2.x > 0.9 and pp2.x < 2.1 and pp2.y > 13.1 and pp2.y < 13.85 and mv.z < -0.1 and player.position.y < 1.0:
+	stair_cd = maxf(0.0, stair_cd - d)
+	if stair_t < 0.0 and stair_cd <= 0.0:
+		# v12 : zones larges + AUCUNE condition de direction (l'ancienne exigeait mv.z et la base
+		# de la volée était collée au mur sud -> escalier impossible à déclencher en jeu)
+		if pp2.x > 0.65 and pp2.x < 2.4 and pp2.y > 12.4 and pp2.y < 13.95 and player.position.y < 1.0:
 			stair_t = 0.0
 			stair_dir = 1
-		elif pp2.x > 0.9 and pp2.x < 2.1 and pp2.y > 8.35 and pp2.y < 9.1 and mv.z > 0.1 and player.position.y > 2.0:
+			_toast("ESCALIER → ÉTAGE (2,5 s)", 2.0)
+		elif pp2.x > 0.65 and pp2.x < 2.4 and pp2.y > 6.6 and pp2.y < 8.3 and player.position.y > 2.0:
 			stair_t = 1.0
 			stair_dir = -1
+			_toast("ESCALIER → REZ-DE-CHAUSSÉE (2,5 s)", 2.0)
 	if stair_t >= 0.0:
 		var ascend := stair_dir > 0
 		if ascend:
@@ -2611,10 +2754,11 @@ func _process(d: float) -> void:
 		else:
 			stair_t -= d / 2.5
 		var t := clampf(stair_t, 0.0, 1.0)
-		player.position = Vector3(1.5, t * 2.98, lerpf(13.55, 8.55, t))
+		player.position = Vector3(1.5, t * 2.98, lerpf(12.45, 7.5, t))
 		player.velocity = Vector3.ZERO
 		if (ascend and stair_t >= 1.0) or (not ascend and stair_t <= 0.0):
 			stair_t = -1.0
+			stair_cd = 1.0
 		skip_move = true
 		mv = Vector3.ZERO
 	if not skip_move:
@@ -2638,10 +2782,10 @@ func _process(d: float) -> void:
 		hands.position = Vector3(cos(bob * 0.5) * 0.012, -0.36 + sin(bob) * 0.018 + (0.03 if stamina < 0.2 else 0.0), -0.55)
 		hands.rotation.z = sin(bob * 0.5) * 0.02
 	cam.rotation = Vector3(pitch, 0, 0)
-	cam.position = Vector3(0, EYE + sin(bob) * 0.035, 0)
+	cam.position = Vector3(0, EYE - (0.42 if crouch else 0.0) + sin(bob) * 0.035, 0)
 	var target_noise := 0.03
 	if mv.length_squared() > 0.01:
-		target_noise = 1.0 if want_sprint else 0.18
+		target_noise = 1.0 if want_sprint else (0.07 if crouch else 0.18)
 	if stamina < 0.5:
 		target_noise += 0.35
 	if stamina < 0.25:
@@ -2666,6 +2810,19 @@ func _process(d: float) -> void:
 			play("chime", -6.0)
 			_toast(tt("candy_pickup"), 3.0)
 			alert_t = maxf(alert_t, 1.5)
+	for ni2 in range(NOTE_SPOTS.size()):
+		if taken_notes[ni2]:
+			continue
+		if absf(player.position.y - NOTE_SPOTS[ni2].y) > 1.4:
+			continue
+		if Vector2(NOTE_SPOTS[ni2].x, NOTE_SPOTS[ni2].z).distance_to(p2z) < 0.95:
+			taken_notes[ni2] = true
+			notes_found += 1
+			if ni2 < note_meshes.size() and is_instance_valid(note_meshes[ni2]):
+				note_meshes[ni2].queue_free()
+			play("whisper", -6.0)
+			_toast(tt("note_%d" % (ni2 + 1)), 6.5)
+			alert_t = maxf(alert_t, 1.0)
 	if key_mesh_e != null and is_instance_valid(key_mesh_e) and key_mesh_e.visible:
 		if p2z.distance_to(key_exit_pos) < 0.9 and player_level == key_exit_lvl:
 			has_key_exit = true
@@ -2864,14 +3021,19 @@ func _process(d: float) -> void:
 			if legn != null:
 				legn.rotation.x = sin(ent_phase + (0.0 if ln2 == "LegL" else PI)) * (0.8 if entity_mode == 2 else 0.35)
 		entity.rotation.x = 0.14 if entity_mode == 2 else 0.04
-	if ghost_arrow != null and is_instance_valid(ghost_arrow):
-		ghost_arrow.visible = hud_on
-		var dirv := (exit_pos - p2z).normalized()
-		var gp := p2z + dirv * 1.7
-		var d_exit := (exit_pos - p2z).length()
-		ghost_arrow.position = Vector3(gp.x, 0.025, gp.y)
-		ghost_arrow.rotation = Vector3(0.0, atan2(dirv.x, dirv.y), 0.0)
-		ghost_arrow.material_override.emission_energy = (0.75 + sin(run_time * 4.0) * 0.2) * clampf(d_exit / 4.0, 0.0, 1.0)
+	if scare_t > 0.0:
+		scare_t += d
+		var sk := clampf(scare_t / 0.6, 0.0, 1.0)
+		var amp := 30.0 * (1.0 - sk) + 3.0
+		scare_rect.position = Vector2(randf_range(-amp, amp), randf_range(-amp, amp))
+		scare_rect.pivot_offset = scare_rect.size * 0.5
+		var zk := lerpf(1.3, 1.0, sk)
+		scare_rect.scale = Vector2(zk, zk)
+		flash_rect.color = Color(0.95, 0.05, 0.05, maxf(0.0, 0.5 - scare_t * 1.5))
+		flash_rect.visible = flash_rect.color.a > 0.01
+		if scare_t > 1.15:
+			scare_t = 0.0
+			flash_rect.visible = false
 	osd_lbl.visible = hud_on and fmod(run_time, 1.6) < 0.95
 	if banner_timer > 0.0:
 		banner_timer -= d
@@ -2895,7 +3057,7 @@ func _process(d: float) -> void:
 			play("whisper", -6.0)
 	elif mistakes >= 2 and rng.randf() < d * 0.03:
 		play("whisper", -18.0)
-	hud_lbl.text = tt("progress") % int((exit_pos - Vector2(player.position.x, player.position.z)).length())
+	hud_lbl.text = tt("progress") % int((exit_pos - Vector2(player.position.x, player.position.z)).length()) + "  ·  " + (tt("notes") % notes_found)
 	if noise_fill != null:
 		noise_fill.size.x = 160.0 * clampf(noise, 0.0, 1.0)
 
@@ -3083,7 +3245,7 @@ func _dbg_audit(d: float) -> void:
 			if player.global_position.y < 2.4 or player.global_position.z > 9.4:
 				fail = "stairs"
 				print("STAIRS BLOCKED ", player.global_position)
-			if _bfs_path(_node_of(Vector2(1.5, 7.6), 1), _node_of(exit_pos, 0)).size() < 2:
+			if _bfs_path(_node_of(Vector2(1.5, 7.5), 1), _node_of(exit_pos, 0)).size() < 2:
 				fail = "upbfs"
 			dbg_move_frames = 0
 			has_key_exit = true

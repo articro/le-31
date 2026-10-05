@@ -66,3 +66,20 @@ bascule Haute/Basse qualité en jeu (un message s'affiche).
 
 **À vérifier en jeu** : sol partout, plafond, murs sans trous, flèche plate devant toi,
 monstre dans le couloir (pose de la capture n°4 : approche-le en allumant la lampe G).
+
+## 8. NOUVEAU — v12 « ÉLARGIE »
+- **Flèche au sol supprimée** (elle suivait le joueur : retirée à sa demande).
+- **Lampe torche recalibrée** : énergie 9 → 4,6 · portée 18 → 13 m · faisceau 50° → 42°.
+- **ESCALIER RÉPARÉ** : la volée de marches avait sa base collée au mur sud → impossible d'entrer dans
+  la zone de déclenchement. Volée reculée de 1,2 m, zones de déclenchement élargies et **sans condition
+  de direction**, cooldown anti-rebond, toast d'information. L'escalier monte maintenant à l'ÉTAGE.
+- **Maison élargie** : le couloir passe de 2,4 m à **4,0 m** de large (z 5,0 → 9,0) ; murs, portes,
+  piliers, dalles de plafond et mobilier recalculés. L'espace de jeu augmente nettement.
+- **SCREAMER refait** (fini le smiley) : nouveau visage found-footage 1997, flash rouge, secousse,
+  zoom, son doublé et désaccordé, 1,6 s de frayeur avant le respawn.
+- **Monstre encore plus détaillé** : genoux, chevilles, orteils, côtes, vertèbres, clavicules,
+  tendons, cheveux (en plus : paupières cousues, dents, mains osseuses, loques).
+- **NOUVEAU — ACCROUPISSEMENT : touche C** — 1,7 m/s, bruit de pas **0,07** : elle ne t'entend
+  qu'à ~1 m. Idéal pour passer derrière elle.
+- **NOUVEAU — 5 NOTES À TROUVER** (lore du 31/10/1997) : compteur « NOTES n/5 » dans le HUD,
+  chuchotement à chaque ramassage.
