@@ -91,6 +91,8 @@ const TR := {
 		"back": "RETOUR",
 		"toast_arrow": "Trouve la clé dorée : elle brille quelque part dans la maison.",
 		"crouch_on": "Accroupi : tu fais presque aucun bruit (C pour te relever)",
+		"blackout_on": "PANNE DE COURANT — la maison est noire. Reste à la lampe torche.",
+		"blackout_end": "Le courant revient…", 
 		"crouch_off": "Debout",
 		"notes": "NOTES %d/5",
 		"note_1": "NOTE 1/5 : « 31 octobre 1997. Elle est revenue. Ne cours pas : elle entend le sol. »",
@@ -200,6 +202,8 @@ const TR := {
 		"back": "BACK",
 		"toast_arrow": "Find the golden key: it glows somewhere in the house.",
 		"crouch_on": "Crouching: you make almost no sound (C to stand up)",
+		"blackout_on": "POWER CUT — the house is dark. Stay on your flashlight.",
+		"blackout_end": "The power comes back…", 
 		"crouch_off": "Standing",
 		"notes": "NOTES %d/5",
 		"note_1": "NOTE 1/5: \"October 31, 1997. She is back. Don't run: she hears the floor.\"",
@@ -564,6 +568,10 @@ var dbg_stuck_t := 0.0
 var dbg_move_frames := 0
 var stair_t := -1.0
 var stair_cd := 0.0
+var blackout_t := 0.0
+var blackout_cd := 55.0
+var blackout_on := false
+var ent_breath: AudioStreamPlayer3D = null
 var stair_dir := 1
 var dbg_move_dir := Vector2.ZERO
 var dbg_last_pos := Vector2.ZERO
@@ -1425,6 +1433,14 @@ func _make_entity() -> Node3D:
 	aura.omni_range = 1.9
 	aura.position = Vector3(0, 1.5, 0)
 	nd.add_child(aura)
+	# v12.1 : respiration en 3D — on l'ENTEND respirer avant de la voir (indice de proximité)
+	ent_breath = AudioStreamPlayer3D.new()
+	ent_breath.stream = load("res://assets/audio/breath.wav")
+	ent_breath.volume_db = -22.0
+	ent_breath.unit_size = 6.0
+	ent_breath.max_distance = 16.0
+	ent_breath.position = Vector3(0, 1.9, 0)
+	nd.add_child(ent_breath)
 	return nd
 
 func _make_hand_v2(side: float, bone: StandardMaterial3D) -> Node3D:
@@ -2292,6 +2308,9 @@ func _begin_run() -> void:
 	scare_rect.visible = false
 	flash_rect.visible = false
 	crouch = false
+	blackout_on = false
+	blackout_t = 0.0
+	blackout_cd = 55.0
 	ts_lbl.visible = true
 	run_time = 0.0
 	progress = 0
@@ -2499,8 +2518,11 @@ func _caught() -> void:
 		alert_t = 0.0
 		chase_t = 0.0
 		if entity != null and is_instance_valid(entity):
+			if ent_breath != null and is_instance_valid(ent_breath):
+				ent_breath.stop()
 			entity.queue_free()
 		entity = null
+		ent_breath = null
 		_spawn_chaser()
 		noise = 0.0
 		stamina = maxf(stamina, 0.6)
@@ -2677,6 +2699,37 @@ func _process(d: float) -> void:
 	var dat := "31 OCT 1997" if lang == "fr" else "OCT 31 1997"
 	var rec := "● " if fmod(run_time, 1.4) < 0.7 else "  "
 	ts_lbl.text = "%s%s %02d:%02d:%02d" % [rec, dat, (secs / 3600) % 24, (secs / 60) % 60, secs % 60]
+	# v12.1 : PANNE DE COURANT — les lampes s'éteignent quelques secondes (jamais en mode bot/audit)
+	if dbg == "" and state == "play":
+		if blackout_on:
+			blackout_t -= d
+			if blackout_t <= 0.0:
+				blackout_on = false
+				blackout_cd = rng.randf_range(50.0, 95.0)
+				for lp5 in lamps:
+					if lp5[3]:
+						lp5[0].visible = true
+						lp5[1].emission_energy = 5.0
+				if env != null:
+					env.ambient_light_energy = 0.30
+				_toast(tt("blackout_end"), 2.5)
+				play("creak", -10.0, 1.4)
+		else:
+			blackout_cd -= d
+			if blackout_cd <= 0.0:
+				blackout_on = true
+				blackout_t = rng.randf_range(7.0, 12.0)
+				for lp6 in lamps:
+					if lp6[3]:
+						lp6[0].visible = false
+						lp6[1].emission_energy = 0.0
+				if env != null:
+					env.ambient_light_energy = 0.12
+				flicker_idx = -1
+				play("sting", -6.0)
+				play("wind", -4.0)
+				_toast(tt("blackout_on"), 3.5)
+				alert_t = maxf(alert_t, 0.6)
 	if flicker_idx < 0 and rng.randf() < d * 0.06:
 		var lits := []
 		for k4 in range(lamps.size()):
@@ -3013,6 +3066,11 @@ func _process(d: float) -> void:
 				var foren := armn.get_node_or_null("Fore")
 				if foren != null:
 					foren.rotation.x = (-0.5 if entity_mode == 2 else -0.08) + sin(tt2 * 5.7 + sgn) * 0.08
+		if ent_breath != null and is_instance_valid(ent_breath):
+			if not ent_breath.playing:
+				ent_breath.play()
+			ent_breath.volume_db = (-9.0 if entity_mode == 2 else (-16.0 if entity_mode == 1 else -22.0))
+			ent_breath.pitch_scale = 1.30 if entity_mode == 2 else (1.12 if entity_mode == 1 else 1.0)
 		entity.position.y = lerpf(entity.position.y, _terrain_y(Vector2(entity.position.x, entity.position.z), ent_level), minf(1.0, 7.0 * d))
 		entity.position.y += absf(sin(tt2 * 4.4)) * (0.055 if entity_mode == 2 else 0.012)
 		ent_phase += d * (6.5 if entity_mode == 2 else 2.2)
