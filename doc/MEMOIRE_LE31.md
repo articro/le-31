@@ -64,3 +64,10 @@ Le projet « Marmite & Monstres » est ABANDONNÉ par l'utilisateur : ne JAMAIS 
 2. Si validé : pipeline TikTok/Shorts (approuvé en principe, CPU-only, ffmpeg/numpy maison, matière = captures user ou teasers motion-design) — NE PAS lancer sans feu vert.
 3. v11 éventuel sur demande user uniquement (ex. extérieur, nouveaux étages, narration).
 4. Révoquer l'ancien PAT après usage.
+
+## 7. État v11 (2026-10-04 soir)
+- Une session séparée a démarré v11 : patch « v11d » = **extérieur existant (sol + arbres + nuit)** visible depuis les fenêtres/sortie + **finitions du monstre**. Cette session a CRASHÉ 3× (« Something went wrong ») pendant un rendu de shots sous **lavapipe** (VK_DRIVER_FILES=lvp_icd.json, 28 min) → son workspace est probablement perdu.
+- **Aucun commit/tag v11 sur GitHub** (vérifié : dernier commit = v10 + docs mémoire). Donc v11 est À REFAIRE depuis la base v10, sauf si un tag `v11-wip` apparaît (vérifier `GET /repos/articro/le-31/tags` au démarrage).
+- Feuille de route v11 retenue : (1) extérieur nuit (sol, arbres silhouette, ciel/lune) visible par fenêtres + porte de sortie ouverte ; (2) finitions monstre (détails silhouette, mains/griffes, yeux) ; (3) audit + matrice bots verts ; (4) shots mesa-vulkan ; (5) push release v11.
+- **RÈGLE ANTI-CRASH (absolue)** : après chaque étape validée (parse OK, audit OK, matrice OK), commit + tag `v11-wip` + push AVANT tout rendu long ou toute opération risquée. Un rendu de shots ne se lance JAMAIS avec du travail non poussé.
+- Rendus shots : `sudo apt-get install -y xvfb mesa-vulkan-drivers` puis `xvfb-run -a Godot --path . --rendering-driver vulkan --resolution 960x540 --dbg=shot` (~5 min). JAMAIS lavapipe/lvp_icd.json (28 min, OOM, crash de turn).
