@@ -71,3 +71,14 @@ Vue de face + vue de profil, fond gris uni, pose neutre. C'est le carburant des 
    ombres portées, pas dans le couloir, sillons dans le plancher).
 3. **Si tu ne veux rien téléverser** : dis-le, je peux pousser l'étage 1 plus loin
    (textures d'yeux cousus, plaies, animation de mâchoire) sans aucune IA 3D.
+
+---
+
+## ETAPE 2 : FAITE (v13, 2026-10-05) — le modele IA est en jeu
+`monstre.glb` (TRELLIS.2, 96 251 tris) a ete decoupe en 4 parties + texture, integre dans `main.gd`
+via `_build_entity_model()` (**repli procedural conserve** : `--dbg=nomodel` ou fichiers absents).
+Resultat : silhouettes/texture realistes (peau texturée 1024, SSS, rim), patrouille et chasse animees
+(jambes balances sur pivots de hanches, tete qui dodeline, corps qui tangue), sons 3D dans le modele.
+Reste optionnel (etage 1 renforce) si le rendu ne convainc pas : plaies, machoire qui s'ouvre a l'attaque,
+decalques de sang. Regenerer une variante = relancer le Space TRELLIS avec le meme `monstre_front.png`
+(seed random) : l'integration est automatique au prochain `--import`.

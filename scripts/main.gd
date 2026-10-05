@@ -1147,8 +1147,15 @@ func _make_pumpkin(at: Vector3, scale := 1.0) -> Node3D:
 
 
 func _make_entity() -> Node3D:
+	# v13 : si le modele sculpte (TRELLIS) est present, on l'utilise ; sinon repli procedural.
+	if dbg != "nomodel" and ResourceLoader.exists("res://assets/models/monstre_body.obj"):
+		var md := _build_entity_model()
+		if md != null:
+			return md
 	# « ELLE » v11 : grande silhouette voûtée 2,3 m, bras très longs tombant sous les genoux,
 	# tête aveugle enfoncée entre les épaules, mâchoire fendue, mains osseuses, loques.
+	if dbg != "":
+		print("DBG entity=PROCEDURAL")
 	var nd := Node3D.new()
 	# v12.2 : peau réaliste = texture cadavérique + normal map + rugosité + sous-surface (SSS)
 	var skin := StandardMaterial3D.new()
@@ -1479,6 +1486,84 @@ func _make_entity() -> Node3D:
 	nd.add_child(ent_sniff)
 	return nd
 
+func _build_entity_model() -> Node3D:
+	# v13 : « ELLE » sculptee par IA (TRELLIS), decoupee en 4 parties animables.
+	# Pivots : hanches y=0.94, cou y=2.15 (bakes dans les .obj), hauteur 2,35 m, visage vers -Z.
+	var body_mesh = load("res://assets/models/monstre_body.obj")
+	var head_mesh = load("res://assets/models/monstre_head.obj")
+	var legl_mesh = load("res://assets/models/monstre_legL.obj")
+	var legr_mesh = load("res://assets/models/monstre_legR.obj")
+	if body_mesh == null or head_mesh == null or legl_mesh == null or legr_mesh == null:
+		return null
+	if dbg != "":
+		print("DBG entity=MODEL3D (TRELLIS)")
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = load("res://assets/models/monstre_tex.png")
+	m.albedo_color = Color(0.66, 0.64, 0.62)
+	m.roughness = 0.72
+	m.metallic = 0.0
+	m.subsurf_scatter_enabled = true
+	m.subsurf_scatter_strength = 0.16
+	m.rim_enabled = true
+	m.rim = 0.55
+	m.rim_tint = 0.6
+	m.cull_mode = StandardMaterial3D.CULL_DISABLED
+	var nd := Node3D.new()
+	var HIP := 0.94
+	var NECK := 2.15
+	var body := MeshInstance3D.new()
+	body.name = "Body"
+	body.mesh = body_mesh
+	body.material_override = m
+	body.position = Vector3(0, HIP, 0)
+	nd.add_child(body)
+	for pr in [["LegL", legl_mesh], ["LegR", legr_mesh]]:
+		var lp := Node3D.new()
+		lp.name = pr[0]
+		lp.position = Vector3(0, HIP, 0)
+		var mi := MeshInstance3D.new()
+		mi.mesh = pr[1]
+		mi.material_override = m
+		lp.add_child(mi)
+		nd.add_child(lp)
+	var hd := Node3D.new()
+	hd.name = "Head"
+	hd.position = Vector3(0, NECK, 0)
+	var hm := MeshInstance3D.new()
+	hm.mesh = head_mesh
+	hm.material_override = m
+	hd.add_child(hm)
+	nd.add_child(hd)
+	var aura := OmniLight3D.new()
+	aura.light_color = Color(0.72, 0.68, 0.62)
+	aura.light_energy = 0.30
+	aura.omni_range = 1.9
+	aura.position = Vector3(0, 1.5, 0)
+	nd.add_child(aura)
+	ent_breath = AudioStreamPlayer3D.new()
+	ent_breath.stream = load("res://assets/audio/breath.wav")
+	ent_breath.volume_db = -22.0
+	ent_breath.unit_size = 6.0
+	ent_breath.max_distance = 16.0
+	ent_breath.position = Vector3(0, 1.9, 0)
+	nd.add_child(ent_breath)
+	ent_growl = AudioStreamPlayer3D.new()
+	ent_growl.stream = load("res://assets/audio/growl.wav")
+	ent_growl.volume_db = -8.0
+	ent_growl.unit_size = 9.0
+	ent_growl.max_distance = 26.0
+	ent_growl.position = Vector3(0, 1.7, 0)
+	nd.add_child(ent_growl)
+	ent_sniff = AudioStreamPlayer3D.new()
+	ent_sniff.stream = load("res://assets/audio/sniff.wav")
+	ent_sniff.volume_db = -10.0
+	ent_sniff.unit_size = 5.0
+	ent_sniff.max_distance = 14.0
+	ent_sniff.position = Vector3(0, 1.9, -0.2)
+	nd.add_child(ent_sniff)
+	return nd
+
+
 func _make_hand_v2(side: float, bone: StandardMaterial3D) -> Node3D:
 	var h := Node3D.new()
 	var palm := MeshInstance3D.new()
@@ -1636,6 +1721,9 @@ func _move_entity_toward(target2: Vector2, spd: float, d: float, tlvl := -1) -> 
 	if dirv.length() > 0.01:
 		dirv = dirv.normalized()
 		entity.position = Vector3(e2.x + dirv.x * spd * d, 0, e2.y + dirv.y * spd * d)
+		# v13 : orientation luee (le modele 3D regarde vers -Z, comme la version procedurale)
+		if entity_mode != 2:
+			entity.rotation.y = lerp_angle(entity.rotation.y, atan2(-dirv.x, -dirv.y), minf(1.0, 3.6 * d))
 
 
 func _spawn_chaser() -> void:
@@ -1908,7 +1996,7 @@ func _build_ui() -> void:
 	title_ctl.add_child(sb)
 	var vtag := Label.new()
 	vtag.name = "Ver"
-	vtag.text = "v11 VISION"
+	vtag.text = "v13 CLAIRVOYANCE"
 	vtag.position = Vector2(1180, 690)
 	vtag.size = Vector2(180, 24)
 	vtag.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -3085,7 +3173,7 @@ func _process(d: float) -> void:
 		var tt2 := run_time * sp2
 		var mv2 := epos2 - p2z
 		if entity_mode == 2 and mv2.length_squared() > 0.01:
-			entity.rotation.y = atan2(mv2.x, mv2.y)
+			entity.rotation.y = atan2(-mv2.x, -mv2.y)
 		elif entity_path.size() > 0 or mv2.length_squared() > 0.01:
 			var facedir := (epos2 - Vector2(entity.position.x, entity.position.z))
 			if facedir.length_squared() < 0.00001:

@@ -1,4 +1,4 @@
-# LE 31 — MAISON HANTÉE (v10) — LANCEMENT DANS GODOT (FR)
+# LE 31 — MAISON HANTÉE (v13) — LANCEMENT DANS GODOT (FR)
 
 ## 1. Installer Godot
 - Télécharge **Godot 4.3 STABLE, version « Standard »** (pas .NET / pas 4.4+) :
@@ -6,7 +6,7 @@
 - Aucune installation : dézippe et lance l'exécutable.
 
 ## 2. Ouvrir le jeu
-- Dézippe `LE31_projet_godot_v10.zip` où tu veux (le dossier `hantise/`).
+- Dézippe `LE31_projet_godot_v13.zip` où tu veux (le dossier `hantise/`).
 - Dans Godot : Manager → Import → sélectionne `hantise/project.godot` → Import & Edit.
 - Au premier lancement, laisse Godot réimporter les assets (~1-2 min, une seule fois).
 - Appuie sur **F5** (ou le bouton Lecture). Choisis FRANÇAIS ou ENGLISH. Ça tourne.
