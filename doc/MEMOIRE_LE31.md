@@ -71,3 +71,12 @@ Le projet « Marmite & Monstres » est ABANDONNÉ par l'utilisateur : ne JAMAIS 
 - Feuille de route v11 retenue : (1) extérieur nuit (sol, arbres silhouette, ciel/lune) visible par fenêtres + porte de sortie ouverte ; (2) finitions monstre (détails silhouette, mains/griffes, yeux) ; (3) audit + matrice bots verts ; (4) shots mesa-vulkan ; (5) push release v11.
 - **RÈGLE ANTI-CRASH (absolue)** : après chaque étape validée (parse OK, audit OK, matrice OK), commit + tag `v11-wip` + push AVANT tout rendu long ou toute opération risquée. Un rendu de shots ne se lance JAMAIS avec du travail non poussé.
 - Rendus shots : `sudo apt-get install -y xvfb mesa-vulkan-drivers` puis `xvfb-run -a Godot --path . --rendering-driver vulkan --resolution 960x540 --dbg=shot` (~5 min). JAMAIS lavapipe/lvp_icd.json (28 min, OOM, crash de turn).
+
+## 8. Règle « petits turns » (anti-crash plateforme, 5 oct 2026)
+- Des sessions neuves ont crashé (« Something went wrong ») sur des turns lourds (fetch multiples + rebuild + apt + audit + rendus en un seul message).
+- CONSÉQUENCE OBLIGATOIRE : une seule étape par message/turn. Ordre standard d'un démarrage :
+  turn 1 = récupérer + lire la mémoire, résumer en 5 puces, STOP ;
+  turn 2 = reconstruire le workspace (zip v10 ou tag v11-wip) + check-only, STOP ;
+  turn 3 = import + audit, STOP ; turn 4 = patch v11 A + push wip ; etc.
+- Jamais apt + import + audit + patch dans le même turn. Jamais de rendu shot dans un turn qui fait autre chose.
+- Si « Something went wrong » : renvoyer « continue » UNE fois ; si répété 3× avec des messages minuscules = incident plateforme, attendre 15 min ou changer d'onglet/navigateur.
