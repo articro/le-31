@@ -423,6 +423,7 @@ var rig_sole := []             # enveloppe de la semelle (y,z) dans le repere de
 var rig_sole_k0 := 0.0
 var rig_stuck_t := 0.0
 var rig_stuck_pos := Vector2.ZERO
+var ent_ghost_t := 0.0   # v22d : bloquee -> traverse murs/props droit vers toi (demande utilisateur)
 const RIG_MODES := {
 	0: {"lean": 0.05, "head_p": 0.10, "arm_x": -0.15, "arm_z": 0.60, "arm_fwd": -0.30, "elbow": -0.30, "sh_up": 0.05, "chest_p": 0.08, "amp": 0.45, "stride": 0.30, "jaw": 0.02},
 	1: {"lean": 0.20, "head_p": -0.05, "arm_x": -0.10, "arm_z": 0.55, "arm_fwd": -0.48, "elbow": -0.60, "sh_up": 0.10, "chest_p": 0.14, "amp": 1.00, "stride": 0.42, "jaw": 0.06},
@@ -439,6 +440,11 @@ var ent_spawn_delay := 75.0    # v17 : elle dort tant que tu n'as pas touche a u
 # ---- v21 : props animes (horloge a balancier) ----
 var clock_pend: Node3D = null
 var clock_pl: AudioStreamPlayer3D = null
+# ---- v22d : poupee qui regarde, boite a musique (dormance), jumpscare d'absence ----
+var doll_head: Node3D = null
+var doll_root: Node3D = null
+var music_box_pl: AudioStreamPlayer = null
+var absence_t := 0.0
 var creek_sfx_t := 6.0
 # ================= v16 : laisse d'ecoute + discipline de cachette =================
 var heard_pos := Vector2.ZERO
@@ -994,23 +1000,24 @@ func _build_house() -> void:
 	# escalier du garage -> ÉTAGE (rampe physique + marches déco)
 	var ramp_len := sqrt(5.15 * 5.15 + 2.98 * 2.98)
 	var ramp_ang := atan2(2.98, 5.15)
-	# v21a : rampe visuelle = poutre sous les marches (le collider, lui, reste a 0.16/1.49 : physique validee)
-	var ramp := _box(Vector3(1.2, 0.10, ramp_len), woodm)
-	ramp.position = Vector3(1.5, 1.40, 9.92)
-	ramp.rotation = Vector3(ramp_ang, 0, 0)
-	world.add_child(ramp)
-	# v19 : SANS ce collider la rampe n'etait que decorative — le joueur butait sur chaque
-	# marche (12 cm) et ne pouvait donc JAMAIS monter a l'etage. Une pente de 30 deg se grimpe.
+	# v22b : escalier PROPRE — limons pleins + palier ; plus aucune poutre qui depasse
+	# (le collider de rampe, lui, reste : physique validee par l'audit)
+	for sx in [0.90, 2.10]:
+		var strn := _box(Vector3(0.08, 0.60, ramp_len + 0.7), woodm)
+		strn.position = Vector3(sx, 1.38, 9.95)
+		strn.rotation = Vector3(ramp_ang, 0, 0)
+		world.add_child(strn)
+	var land := _box(Vector3(1.24, 0.12, 1.0), woodm)
+	land.position = Vector3(1.5, 2.92, 7.55)
+	world.add_child(land)
 	_collider_ramp(Vector3(1.2, 0.16, ramp_len), Vector3(1.5, 1.49, 9.92), ramp_ang)
 	for st in range(24):
 		var scz := 12.4 - st * 0.2146
 		var scy := (st + 1) * 0.124 - 0.062
 		_furn(Vector3(1.2, 0.124, 0.26), Vector3(1.5, scy, scz), woodm)
-		# v21a : contremarche verticale -> l'escalier ne flotte plus, il fait bloc
 		var ris := _box(Vector3(1.2, 0.124, 0.04), woodm)
 		ris.position = Vector3(1.5, scy, scz + 0.13)
 		world.add_child(ris)
-	# v21a : poteau de soutien en bas de volee
 	var post := _box(Vector3(0.12, 1.4, 0.12), woodm)
 	post.position = Vector3(1.5, 0.7, 12.5)
 	world.add_child(post)
@@ -1232,6 +1239,8 @@ func _props_v21(woodm: StandardMaterial3D) -> void:
 	dhead.position = Vector3(0, 0.26, 0)
 	dhead.rotation.z = 0.18   # tete penchee, malaise garanti
 	doll.add_child(dhead)
+	doll_head = dhead   # v22d : elle tournera vers ELLE
+	doll_root = doll
 	for ex in [-1, 1]:
 		var eye := MeshInstance3D.new()
 		var es := SphereMesh.new()
@@ -1313,6 +1322,11 @@ func _props_v21(woodm: StandardMaterial3D) -> void:
 		kk.rotation = Vector3(PI / 2 + 0.25 * ki, 0.4 * ki, 0)
 		hk.add_child(kk)
 	world.add_child(hk)
+	# v22d : boite a musique = tell diégetique de la dormance (elle dort = melodie ; ca s'arrete = reveillee)
+	music_box_pl = AudioStreamPlayer.new()
+	music_box_pl.stream = load("res://assets/audio/music_box.wav")
+	music_box_pl.volume_db = -24.0
+	add_child(music_box_pl)
 
 
 func _make_poster_xy(at: Vector2, ry: float) -> Node3D:
@@ -2138,17 +2152,13 @@ func _decor_rich() -> void:
 		var rug := _quad(tp[1], tp[2])
 		rug.position = tp[0]
 		world.add_child(rug)
-	# --- CARTONS empiles (garage, grenier, cave) ---
-	for i in range(10):
-		var bx := _box(Vector3(0.52, 0.42, 0.42), _simple(Color(0.32, 0.24, 0.14), 0.95))
-		bx.position = Vector3(6.3 + float(i % 3) * 0.62, 0.22 + float(i / 6) * 0.44, 3.0 + float(i % 4) * 0.55)
-		bx.rotation.y = float(i) * 0.31
-		world.add_child(bx)
-	for i2 in range(6):
-		var bx2 := _box(Vector3(0.46, 0.38, 0.38), _simple(Color(0.28, 0.21, 0.12), 0.95))
-		bx2.position = Vector3(2.2 + float(i2 % 2) * 0.55, 0.20 + float(i2 / 4) * 0.40, 12.4 - float(i2 % 3) * 0.5)
-		bx2.rotation.y = float(i2) * 0.5
-		world.add_child(bx2)
+	# --- CARTONS empiles (grenier, garage) — v22b : vrais cartons CC0 ---
+	for i in range(5):
+		_cc0("res://assets/cc0/cardboardBoxClosed.obj", Vector3(6.3 + float(i % 3) * 0.55, 2.98, 3.0 + float(i % 4) * 0.5), float(i) * 0.31, 0.16, i < 3)
+	for i2 in range(3):
+		_cc0("res://assets/cc0/cardboardBoxClosed.obj" if i2 % 2 == 0 else "res://assets/cc0/cardboardBoxOpen.obj", Vector3(2.2 + float(i2) * 0.55, 0.0, 12.2 - float(i2 % 3) * 0.5), float(i2) * 0.5, 0.16)
+	_cc0("res://assets/cc0/trashcan.obj", Vector3(3.5, 0, 12.2), 0.4, 0.117)
+	_cc0("res://assets/cc0/washer.obj", Vector3(5.9, 0, 13.3), PI, 0.19, true)
 	# --- BOUTEILLES et BOCAUX (cuisine, au sol contre le mur) ---
 	for i3 in range(9):
 		var bt := _box(Vector3(0.075, 0.26, 0.075), glass)
@@ -2157,10 +2167,15 @@ func _decor_rich() -> void:
 		var cap := _box(Vector3(0.05, 0.10, 0.05), _simple(Color(0.25, 0.35, 0.22), 0.2))
 		cap.position = Vector3(0.85 + float(i3 % 5) * 0.22, 0.31, 9.55)
 		world.add_child(cap)
-	# --- JOUETS D'ENFANT (chambre d'Elise) ---
-	for i4 in range(7):
+	# --- JOUETS D'ENFANT (chambre d'Elise) — v22b : nounours CC0 + lit ---
+	_cc0("res://assets/cc0/bear.obj", Vector3(14.5, 0, 4.6), 0.6, 0.11)
+	_cc0("res://assets/cc0/bedSingle.obj", Vector3(16.5, 0, 11.8), PI / 2, 0.173)
+	_cc0("res://assets/cc0/sideTable.obj", Vector3(15.2, 0, 12.8), 0.0, 0.103)
+	_cc0("res://assets/cc0/bedSingle.obj", Vector3(6.5, 0, 11.8), PI / 2, 0.173)      # chambre 1
+	_cc0("res://assets/cc0/bookcaseClosed.obj", Vector3(9.6, 0, 13.6), 0.0, 0.2)
+	for i4 in range(3):
 		var tb := _box(Vector3(0.12, 0.12, 0.12), toy1 if i4 % 2 == 0 else toy2)
-		tb.position = Vector3(14.2 + float(i4 % 4) * 0.28, 0.06, 4.4 + float(i4 / 4) * 0.34)
+		tb.position = Vector3(14.2 + float(i4) * 0.3, 0.06, 4.4)
 		tb.rotation.y = float(i4) * 0.7
 		world.add_child(tb)
 	# --- CHAUSSURES / VETEMENTS au sol ---
@@ -2312,12 +2327,18 @@ func _move_entity_toward(target2: Vector2, spd: float, d: float, tlvl := -1) -> 
 	else:
 		entity_path.clear()
 	var dirv := (target2 - e2) if en == tn else (goal - e2)
+	ent_ghost_t = maxf(0.0, ent_ghost_t - d)
+	if ent_ghost_t > 0.0:
+		dirv = target2 - e2   # GHOST : ligne directe, pas de chemin BFS
 	if dirv.length() > 0.01:
 		dirv = dirv.normalized()
 		var step2 := Vector3(dirv.x * spd * d, 0, dirv.y * spd * d)
 		var np := e2 + Vector2(step2.x, step2.z)
-		# v18 : elle ne traverse plus les murs (test de collision + glissement le long de l'obstacle)
-		if _ent_can_stand(np):
+		# v22d GHOST : traverse murs et props droit vers toi
+		if ent_ghost_t > 0.0:
+			entity.position = Vector3(np.x, _terrain_y(np, NODE_LVL[tn]), np.y)
+		# v18 : sinon elle ne traverse plus les murs (glissement le long de l'obstacle)
+		elif _ent_can_stand(np):
 			entity.position = Vector3(np.x, 0, np.y)
 		elif _ent_can_stand(Vector2(np.x, e2.y)):
 			entity.position = Vector3(np.x, 0, e2.y)
@@ -3777,6 +3798,29 @@ func _process(d: float) -> void:
 			clock_pl.play()
 		elif state != "play" and clock_pl.playing:
 			clock_pl.playing = false
+	# v22d : la poupee tourne lentement la tete vers ELLE (< 10 m) — indicateur diegetique
+	if doll_head != null and is_instance_valid(doll_head) and doll_root != null and is_instance_valid(doll_root):
+		var want := 0.0
+		if entity != null and is_instance_valid(entity) and entity.visible:
+			var dd := entity.global_position - doll_head.global_position
+			if Vector2(dd.x, dd.z).length() < 10.0:
+				want = clampf(wrapf(atan2(-dd.x, -dd.z) - doll_root.rotation.y, -PI, PI), -1.1, 1.1)
+		doll_head.rotation.y = lerpf(doll_head.rotation.y, want, minf(1.0, 1.5 * d))
+	# v22d : boite a musique pendant la dormance ; silence = elle est reveillee
+	if music_box_pl != null and is_instance_valid(music_box_pl):
+		var dor := _ent_asleep()
+		if state == "play" and dor and not music_box_pl.playing:
+			music_box_pl.play()
+		elif (not dor or state != "play") and music_box_pl.playing:
+			music_box_pl.stop()
+	# v22d : jumpscare d'absence — fin du silence total, puis sting
+	if absence_t > 0.0:
+		absence_t -= d
+		if absence_t <= 0.0:
+			AudioServer.set_bus_mute(0, false)
+			play("sting", -4.0)
+	elif state != "play":
+		AudioServer.set_bus_mute(0, false)
 	if tension_pl != null:
 		if chasing and not tension_pl.playing:
 			tension_pl.play()
@@ -3998,6 +4042,10 @@ func _process(d: float) -> void:
 				print("DBG heard_arrived t=%.1f" % run_time)
 	elif dist < hear_r:
 		if noise > 0.6 and dist < 6.0:
+			# v22d : jumpscare d'absence — la chasse commence par 4 s de silence TOTAL
+			if entity_mode != 2 and absence_t <= 0.0 and dbg == "":
+				absence_t = 4.0
+				AudioServer.set_bus_mute(0, true)
 			entity_mode = 2
 			chase_t = 0.0
 		elif entity_mode != 2:
@@ -4006,27 +4054,17 @@ func _process(d: float) -> void:
 		entity_target_pos = p2z
 		entity_target_lvl = player_level
 		_move_entity_toward(p2z, 3.6 if entity_mode == 2 else 2.2, d, player_level)
-		# v19 : anti-blocage — si elle n'avance plus alors qu'elle te traque, elle se deplace plus loin
+		# v22d : anti-blocage = MODE FANTOME (plus de teleport loin de toi : elle te suit, meme a travers les murs)
 		rig_stuck_t += d
 		if rig_stuck_t >= 1.6:
 			if Vector2(entity.position.x, entity.position.z).distance_to(rig_stuck_pos) < 0.45:
-				var best6 := -1
-				var bd6 := -1.0
-				for i6 in range(3, NODES.size()):
-					if NODE_LVL[i6] != ent_level:
-						continue
-					var d6: float = (NODES[i6] - p2z).length()
-					if d6 > 7.0 and d6 < 30.0 and d6 > bd6:
-						bd6 = d6
-						best6 = i6
-				if best6 > 0:
-					entity.position = Vector3(NODES[best6].x, _terrain_y(NODES[best6], ent_level), NODES[best6].y)
-					entity_path.clear()
-					entity_target = best6
-					if dbg != "":
-						print("DBG declic anti-blocage -> noeud %d (%.1f m)" % [best6, bd6])
+				ent_ghost_t = 4.0
+				if dbg != "":
+					print("DBG ghost ON (bloquee -> traverse tout, 4 s)")
 			rig_stuck_t = 0.0
 			rig_stuck_pos = Vector2(entity.position.x, entity.position.z)
+		if ent_ghost_t > 0.0 and fmod(run_time, 1.0) < d:
+			play("growl", -9.0, 1.2)   # elle grogne en traversant : tu sais qu'elle arrive
 	else:
 		if entity_mode == 1:
 			_move_entity_toward(entity_target_pos, 2.2, d)

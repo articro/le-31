@@ -1,0 +1,22 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://q3shaghp1u5q"
+path="res://.godot/imported/washer.obj-eb5411132cf75ee593fa3409d91ec388.mesh"
+
+[deps]
+
+files=["res://.godot/imported/washer.obj-eb5411132cf75ee593fa3409d91ec388.mesh"]
+
+source_file="res://assets/cc0/washer.obj"
+dest_files=["res://.godot/imported/washer.obj-eb5411132cf75ee593fa3409d91ec388.mesh", "res://.godot/imported/washer.obj-eb5411132cf75ee593fa3409d91ec388.mesh"]
+
+[params]
+
+generate_tangents=true
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+optimize_mesh=true
+force_disable_mesh_compression=false
