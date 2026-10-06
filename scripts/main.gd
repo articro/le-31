@@ -595,6 +595,27 @@ func _box(sz: Vector3, m: StandardMaterial3D) -> MeshInstance3D:
 	return mi
 
 
+# ---- v22a : props open source Kenney (CC0) ----
+func _cc0(res: String, at: Vector3, ry: float, s: float, collide := true) -> Node3D:
+	var nd := Node3D.new()
+	nd.position = at
+	nd.rotation.y = ry
+	var mi := MeshInstance3D.new()
+	mi.mesh = load(res)
+	nd.add_child(mi)
+	nd.scale = Vector3(s, s, s)
+	world.add_child(nd)
+	if collide and mi.mesh != null:
+		var aabb: AABB = (mi.mesh as Mesh).get_aabb()
+		var sz := aabb.size * s
+		var c := aabb.get_center() * s
+		if absf(fmod(ry / (PI / 2), 2.0)) > 0.5:   # rotation 90/270 : swap x/z
+			sz = Vector3(sz.z, sz.y, sz.x)
+		var rotc := Vector3(c.x * cos(ry) + c.z * sin(ry), c.y, -c.x * sin(ry) + c.z * cos(ry))
+		_collider_box(sz, at + rotc)
+	return nd
+
+
 # ============================================================ monde =======
 
 func _collider_box(sz: Vector3, at: Vector3) -> void:
@@ -941,20 +962,27 @@ func _build_house() -> void:
 	c1k.position = Vector3(13.1, 1.05, 9.07)
 	world.add_child(c1k)
 	_door_panel(Vector2(17.55, 9.0), 1.0)
-	# meubles salon
+	# meubles salon — v22a : props CC0 Kenney (fini les cubes)
 	var woodm := _pbr("door")
-	var cloth := _simple(Color(0.25, 0.12, 0.10), 0.9)
-	_furn(Vector3(2.2, 0.8, 0.9), Vector3(2.0, 0.4, 4.3), cloth)
-	_furn(Vector3(1.4, 0.5, 0.8), Vector3(4.3, 0.25, 2.6), woodm)
-	_furn(Vector3(0.5, 1.8, 3.0), Vector3(0.45, 0.9, 2.6), woodm)
-	# cuisine
-	_furn(Vector3(5.2, 0.9, 0.8), Vector3(10.0, 0.45, 0.7), tilem)
-	_furn(Vector3(0.8, 1.8, 0.8), Vector3(12.4, 0.9, 0.7), _simple(Color(0.7, 0.7, 0.72), 0.3, 0.6))
-	_furn(Vector3(1.6, 0.75, 1.0), Vector3(9.5, 0.38, 3.5), woodm)
-	# salle de bains
-	_furn(Vector3(1.7, 0.6, 0.8), Vector3(18.6, 0.3, 1.0), tilem)   # v21a : baignoire carelee plutot que cube blanc
-	_furn(Vector3(0.6, 0.8, 0.5), Vector3(14.0, 0.4, 0.55), _simple(Color(0.85, 0.85, 0.88), 0.15))
-	_furn(Vector3(0.5, 0.75, 0.55), Vector3(16.2, 0.38, 0.5), _simple(Color(0.8, 0.8, 0.82), 0.2))
+	var cloth := _simple(Color(0.25, 0.12, 0.10), 0.9)   # encore utilise par tapis/tissus plus bas
+	_cc0("res://assets/cc0/loungeSofa.obj", Vector3(2.0, 0, 4.3), -PI / 2, 0.184)        # face +X vers la TV
+	_cc0("res://assets/cc0/cabinetTelevision.obj", Vector3(4.6, 0, 2.6), PI / 2, 0.125) # contre mur est, face -X
+	_cc0("res://assets/cc0/televisionVintage.obj", Vector3(4.6, 0.40, 2.6), PI / 2, 0.134)
+	_cc0("res://assets/cc0/tableCoffee.obj", Vector3(3.2, 0, 3.4), 0.0, 0.136)
+	_cc0("res://assets/cc0/radio.obj", Vector3(4.6, 0.40, 2.0), PI / 2, 0.111)
+	_cc0("res://assets/cc0/bookcaseClosed.obj", Vector3(0.45, 0, 2.6), PI / 2, 0.2)
+	_cc0("res://assets/cc0/plantSmall1.obj", Vector3(0.5, 0, 0.5), 0.3, 0.25)
+	_cc0("res://assets/cc0/lampRoundFloor.obj", Vector3(2.0, 0, 5.6), 0.0, 0.174, false)
+	# cuisine — v22a : vrais meubles CC0
+	_cc0("res://assets/cc0/kitchenCabinet.obj", Vector3(10.0, 0, 0.5), PI, 0.209)
+	_cc0("res://assets/cc0/kitchenSink.obj", Vector3(8.2, 0, 0.5), PI, 0.209)
+	_cc0("res://assets/cc0/kitchenStove.obj", Vector3(12.2, 0, 0.5), PI, 0.163)
+	_cc0("res://assets/cc0/kitchenFridge.obj", Vector3(14.0, 0, 0.5), PI, 0.185)
+	_furn(Vector3(1.6, 0.75, 1.0), Vector3(9.5, 0.38, 3.5), woodm)   # table cuisine (gardee)
+	# salle de bains — v22a : vrais sanitaires CC0
+	_cc0("res://assets/cc0/bathtub.obj", Vector3(18.8, 0, 1.2), PI / 2, 0.134)
+	_cc0("res://assets/cc0/bathroomSink.obj", Vector3(14.0, 0, 0.5), PI, 0.152)
+	_cc0("res://assets/cc0/toilet.obj", Vector3(16.2, 0, 0.6), PI, 0.166)
 	# garage : voiture + étagère
 	_furn(Vector3(4.2, 1.1, 2.0), Vector3(4.25, 0.65, 11.6), _simple(Color(0.16, 0.035, 0.03), 0.35, 0.5))
 	_furn(Vector3(2.3, 0.65, 1.7), Vector3(4.0, 1.5, 11.6), _simple(Color(0.14, 0.03, 0.028), 0.3, 0.5))
@@ -1181,33 +1209,7 @@ func _build_house() -> void:
 
 
 func _props_v21(woodm: StandardMaterial3D) -> void:
-	# ============ v21 PROP 1 : TV CRT + magnetoscope (salon, sur le buffet) ============
-	var dark := _simple(Color(0.09, 0.085, 0.08), 0.55)
-	var tv := Node3D.new()
-	tv.position = Vector3(4.3, 0.73, 2.6)
-	tv.rotation.y = PI / 2   # ecran tourne vers le canape
-	var body := _box(Vector3(0.52, 0.44, 0.46), dark)
-	tv.add_child(body)
-	var scr := _quad(Vector2(0.36, 0.30), _simple(Color(0.015, 0.02, 0.025), 0.12))
-	scr.position = Vector3(0, 0.02, -0.235)
-	tv.add_child(scr)
-	for k in range(2):
-		var knob := MeshInstance3D.new()
-		var kc := CylinderMesh.new()
-		kc.top_radius = 0.02; kc.bottom_radius = 0.02; kc.height = 0.02
-		knob.mesh = kc
-		knob.material_override = _simple(Color(0.7, 0.7, 0.7), 0.4, 0.6)
-		knob.rotation.x = PI / 2
-		knob.position = Vector3(0.20, 0.10 - k * 0.09, -0.235)
-		tv.add_child(knob)
-	var vcr := _box(Vector3(0.40, 0.07, 0.28), _simple(Color(0.12, 0.12, 0.13), 0.4, 0.3))
-	vcr.position = Vector3(0, 0.26, 0.02)
-	tv.add_child(vcr)
-	var led := _quad(Vector2(0.02, 0.012), _emissive(Color(1.0, 0.1, 0.05), 2.2, ""))
-	led.position = Vector3(0.14, 0.26, -0.125)
-	tv.add_child(led)
-	world.add_child(tv)
-	_furn(Vector3(0.52, 0.52, 0.46), Vector3(4.3, 0.76, 2.6), dark)
+	# v22a : la TV procedurale a ete remplacee par televisionVintage.obj (CC0) dans le salon
 	# ============ v21 PROP 2 : poupee de porcelaine (chambre d'Elise) ============
 	var porc := _simple(Color(0.90, 0.86, 0.82), 0.25)
 	porc.subsurf_scatter_enabled = true
