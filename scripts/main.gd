@@ -410,7 +410,7 @@ var ent_model_kind := 2        # 2 = v17 (10 parties) · 1 = v15 (6) · 0 = v13 
 # ---- v19 : creature skinee (monstre_rig.glb, 21 os, peau continue) ----
 var rig_enabled := true
 var rig_state := {}            # instance_id -> {skel, mesh, gait, can, fil}
-var rig_scale := 2.80
+var rig_scale := 2.40   # v21a : 2,80 -> 2,40 m (trop geante sous plafond 2,82 ; reste imposante)
 var rig_y_hip := 0.4154
 var rig_y_ank := 0.0904
 var rig_l_thigh := 0.1838
@@ -431,7 +431,7 @@ const RIG_MODES := {
 	4: {"lean": 0.60, "head_p": 0.12, "arm_x": 0.35, "arm_z": 0.50, "arm_fwd": -1.30, "elbow": -0.50, "sh_up": 0.40, "chest_p": 0.30, "amp": 0.80, "stride": 0.34, "jaw": 0.26},
 }
 var rig_dbg := false
-const ENT_SCALE := 1.191       # v18 : 2,35 m -> 2,80 m (elle doit dominer la piece)
+const ENT_SCALE := 1.021       # v21a : repli procedural aligne sur 2,40 m
 var ent_prev_phase := 0.0
 var ent_anim_dbg := 0
 var ent_step: AudioStreamPlayer3D = null
@@ -949,7 +949,7 @@ func _build_house() -> void:
 	_furn(Vector3(0.8, 1.8, 0.8), Vector3(12.4, 0.9, 0.7), _simple(Color(0.7, 0.7, 0.72), 0.3, 0.6))
 	_furn(Vector3(1.6, 0.75, 1.0), Vector3(9.5, 0.38, 3.5), woodm)
 	# salle de bains
-	_furn(Vector3(1.7, 0.6, 0.8), Vector3(18.6, 0.3, 1.0), _simple(Color(0.85, 0.85, 0.88), 0.15))
+	_furn(Vector3(1.7, 0.6, 0.8), Vector3(18.6, 0.3, 1.0), tilem)   # v21a : baignoire carelee plutot que cube blanc
 	_furn(Vector3(0.6, 0.8, 0.5), Vector3(14.0, 0.4, 0.55), _simple(Color(0.85, 0.85, 0.88), 0.15))
 	_furn(Vector3(0.5, 0.75, 0.55), Vector3(16.2, 0.38, 0.5), _simple(Color(0.8, 0.8, 0.82), 0.2))
 	# garage : voiture + étagère
@@ -963,8 +963,9 @@ func _build_house() -> void:
 	# escalier du garage -> ÉTAGE (rampe physique + marches déco)
 	var ramp_len := sqrt(5.15 * 5.15 + 2.98 * 2.98)
 	var ramp_ang := atan2(2.98, 5.15)
-	var ramp := _box(Vector3(1.2, 0.16, ramp_len), woodm)
-	ramp.position = Vector3(1.5, 1.49, 9.92)
+	# v21a : rampe visuelle = poutre sous les marches (le collider, lui, reste a 0.16/1.49 : physique validee)
+	var ramp := _box(Vector3(1.2, 0.10, ramp_len), woodm)
+	ramp.position = Vector3(1.5, 1.40, 9.92)
 	ramp.rotation = Vector3(ramp_ang, 0, 0)
 	world.add_child(ramp)
 	# v19 : SANS ce collider la rampe n'etait que decorative — le joueur butait sur chaque
@@ -974,6 +975,14 @@ func _build_house() -> void:
 		var scz := 12.4 - st * 0.2146
 		var scy := (st + 1) * 0.124 - 0.062
 		_furn(Vector3(1.2, 0.124, 0.26), Vector3(1.5, scy, scz), woodm)
+		# v21a : contremarche verticale -> l'escalier ne flotte plus, il fait bloc
+		var ris := _box(Vector3(1.2, 0.124, 0.04), woodm)
+		ris.position = Vector3(1.5, scy, scz + 0.13)
+		world.add_child(ris)
+	# v21a : poteau de soutien en bas de volee
+	var post := _box(Vector3(0.12, 1.4, 0.12), woodm)
+	post.position = Vector3(1.5, 0.7, 12.5)
+	world.add_child(post)
 	for rx in [0.92, 2.08]:
 		var rail := _box(Vector3(0.06, 0.5, ramp_len), woodm)
 		rail.position = Vector3(rx, 1.49 + 0.42, 9.92)
@@ -1116,7 +1125,7 @@ func _build_house() -> void:
 	rug2.rotation = Vector3(0, 0, 0)
 	rug2.position = Vector3(17.5, 0.02, 11.4)
 	world.add_child(rug2)
-	var cartm := _simple(Color(0.35, 0.26, 0.16), 0.8)
+	var cartm := _simple(Color(0.27, 0.20, 0.12), 0.9)   # v21a : moins orange sous la lampe
 	for bx in [Vector3(5.2, 0.25, 9.6), Vector3(5.7, 0.25, 10.3), Vector3(5.45, 0.72, 9.95)]:
 		var cb := _box(Vector3(0.5, 0.5, 0.5), cartm)
 		cb.position = bx
@@ -1127,7 +1136,7 @@ func _build_house() -> void:
 	_furn(Vector3(0.5, 0.5, 0.5), Vector3(5.45, 0.72, 9.95), cartm)
 	for cw in [Vector3(0.4, 2.55, 0.4), Vector3(19.6, 2.55, 0.4), Vector3(0.4, 2.55, 13.6), Vector3(19.6, 2.55, 13.6)]:
 		var webm := _simple(Color(0.7, 0.7, 0.68), 0.9)
-		webm.transparency_mode = 1
+		webm.transparency = 1   # v21a : transparency_mode = prop Godot 3 (planches opaques qui flottaient)
 		webm.albedo_color = Color(0.7, 0.7, 0.68, 0.25)
 		var web := _quad(Vector2(0.7, 0.7), webm)
 		web.rotation = Vector3(PI / 2, 0, PI / 4)
@@ -1991,12 +2000,12 @@ func _decor_rich() -> void:
 		world.add_child(rug)
 	# --- CARTONS empiles (garage, grenier, cave) ---
 	for i in range(10):
-		var bx := _box(Vector3(0.52, 0.42, 0.42), _simple(Color(0.46, 0.34, 0.20), 0.95))
+		var bx := _box(Vector3(0.52, 0.42, 0.42), _simple(Color(0.32, 0.24, 0.14), 0.95))
 		bx.position = Vector3(6.3 + float(i % 3) * 0.62, 0.22 + float(i / 6) * 0.44, 3.0 + float(i % 4) * 0.55)
 		bx.rotation.y = float(i) * 0.31
 		world.add_child(bx)
 	for i2 in range(6):
-		var bx2 := _box(Vector3(0.46, 0.38, 0.38), _simple(Color(0.40, 0.29, 0.17), 0.95))
+		var bx2 := _box(Vector3(0.46, 0.38, 0.38), _simple(Color(0.28, 0.21, 0.12), 0.95))
 		bx2.position = Vector3(2.2 + float(i2 % 2) * 0.55, 0.20 + float(i2 / 4) * 0.40, 12.4 - float(i2 % 3) * 0.5)
 		bx2.rotation.y = float(i2) * 0.5
 		world.add_child(bx2)
@@ -2050,7 +2059,7 @@ func _decor_rich() -> void:
 		world.add_child(dish)
 	# --- TOILES D'ARAIGNEES dans les coins hauts ---
 	var web := _simple(Color(0.78, 0.78, 0.74), 0.9)
-	web.transparency_mode = 1
+	web.transparency = 1   # v21a : idem, alpha reel
 	web.albedo_color = Color(0.78, 0.78, 0.74, 0.20)
 	for cn in [Vector3(0.7, 2.60, 0.7), Vector3(18.5, 2.60, 0.7), Vector3(0.7, 2.60, 13.3), Vector3(18.5, 2.60, 13.3),
 			   Vector3(0.7, 5.60, 0.7), Vector3(18.5, 5.60, 13.3), Vector3(11.4, 2.60, 0.7)]:
@@ -2174,8 +2183,9 @@ func _move_entity_toward(target2: Vector2, spd: float, d: float, tlvl := -1) -> 
 			entity.position = Vector3(np.x, 0, e2.y)
 		elif _ent_can_stand(Vector2(e2.x, np.y)):
 			entity.position = Vector3(e2.x, 0, np.y)
-		if entity_mode != 2:
-			entity.rotation.y = lerp_angle(entity.rotation.y, atan2(-dirv.x, -dirv.y), minf(1.0, 3.6 * d))
+		# v21a : en chasse elle ne tournait JAMAIS (elle courait de travers) -> rotation fluide rapide
+		var rot_spd := 3.6 if entity_mode != 2 else 7.5
+		entity.rotation.y = lerp_angle(entity.rotation.y, atan2(-dirv.x, -dirv.y), minf(1.0, rot_spd * d))
 
 
 func _spawn_chaser() -> void:
@@ -3587,11 +3597,13 @@ func _process(d: float) -> void:
 	if stair_t < 0.0 and stair_cd <= 0.0:
 		# v12 : zones larges + AUCUNE condition de direction (l'ancienne exigeait mv.z et la base
 		# de la volée était collée au mur sud -> escalier impossible à déclencher en jeu)
-		if pp2.x > 0.65 and pp2.x < 2.4 and pp2.y > 12.4 and pp2.y < 13.95 and player.position.y < 1.0:
+		# v21a : zone elargie MAIS il faut se diriger vers la volee (sinon un bot/joueur qui
+		# traverse le garage ou longe la tremie se fait teleporter en boucle)
+		if pp2.x > 0.55 and pp2.x < 2.45 and pp2.y > 12.15 and pp2.y < 14.0 and player.position.y < 1.0 and mv.z < -0.05:
 			stair_t = 0.0
 			stair_dir = 1
 			_toast("ESCALIER → ÉTAGE (2,5 s)", 2.0)
-		elif pp2.x > 0.65 and pp2.x < 2.4 and pp2.y > 6.6 and pp2.y < 8.3 and player.position.y > 2.0:
+		elif pp2.x > 0.55 and pp2.x < 2.45 and pp2.y > 6.5 and pp2.y < 8.45 and player.position.y > 2.0 and mv.z > 0.05:   # v21a : zone elargie
 			stair_t = 1.0
 			stair_dir = -1
 			_toast("ESCALIER → REZ-DE-CHAUSSÉE (2,5 s)", 2.0)
@@ -4228,6 +4240,8 @@ func _dbg_shot(d: float) -> void:
 
 
 func _dbg_walk(d: float) -> void:
+	# v21a : walk = test "joueur bruyant" -> elle est reveillee (sinon le bot gagne avant 75 s)
+	ent_spawn_delay = 0.0
 	var p2 := Vector2(player.position.x, player.position.z)
 	var final_goal := exit_pos if has_key_exit else key_exit_pos
 	var final_lvl := 0 if has_key_exit else key_exit_lvl
@@ -4711,52 +4725,23 @@ func _dbg_m2(d: float) -> void:
 	dbg_m2_i += 1
 	if dbg_m2_i < 3:
 		return
-	var m := _build_entity_model2()
-	if m == null:
+	# v21a : les OBJ v15/v17 ont ete supprimes au menage v20 (creature skinnee) ->
+	# m2 verifie desormais la creature skinnee de reference (maillage continu + squelette)
+	var r := _build_entity_rig()
+	if r == null:
+		print("DBG m2=ECHEC (rig)")
+		get_tree().quit(1)
+		return
+	var sk := _rig_find_skel(r)
+	var mi := _rig_find_mesh(r)
+	var nb := sk.get_bone_count() if sk != null else 0
+	var tot := _rig_tri_count(mi)
+	print("DBG m2 RIG SKINNE os=%d tri=%d" % [nb, tot])
+	if nb < 21 or tot < 90000:
 		print("DBG m2=ECHEC")
 		get_tree().quit(1)
 		return
-	var total := 0
-	for c in m.get_children():
-		if not (c is Node3D):
-			continue
-		var tris := 0
-		if c is MeshInstance3D and c.mesh is ArrayMesh:
-			var arr: Array = (c.mesh as ArrayMesh).surface_get_arrays(0)
-			tris = (arr[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
-		else:
-			for cc in c.get_children():
-				if cc is MeshInstance3D and cc.mesh is ArrayMesh:
-					var a2: Array = (cc.mesh as ArrayMesh).surface_get_arrays(0)
-					tris += (a2[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
-		total += tris
-		print("DBG m2 node=%-5s tri=%-6d pos=%s rot=%s" % [c.name, tris, c.position.snapped(Vector3(0.01, 0.01, 0.01)), c.rotation.snapped(Vector3(0.01, 0.01, 0.01))])
-	print("DBG m2 total_tris=", total)
-	# v17 : verifier aussi le modele a 10 parties
-	var m3 := _build_entity_model3()
-	if m3 == null:
-		print("DBG m3=ECHEC")
-		get_tree().quit(1)
-		return
-	var tot3 := 0
-	for c3 in m3.get_children():
-		if not (c3 is Node3D):
-			continue
-		var t3 := 0
-		if c3 is MeshInstance3D and c3.mesh is ArrayMesh:
-			t3 = ((c3.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
-		else:
-			for cc3 in c3.get_children():
-				if cc3 is MeshInstance3D and cc3.mesh is ArrayMesh:
-					t3 += ((cc3.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
-				elif cc3 is Node3D:
-					for cc4 in cc3.get_children():
-						if cc4 is MeshInstance3D and cc4.mesh is ArrayMesh:
-							t3 += ((cc4.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
-		tot3 += t3
-		print("DBG m3 node=%-11s tri=%-6d pos=%s rot=%s enfants=%d" % [c3.name, t3, c3.position.snapped(Vector3(0.01, 0.01, 0.01)), c3.rotation.snapped(Vector3(0.01, 0.01, 0.01)), c3.get_child_count()])
-	print("DBG m3 total_tris=", tot3)
-	print("DBG m3 OK")
+	print("DBG m2 OK")
 	get_tree().quit(0)
 
 
