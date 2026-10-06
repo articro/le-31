@@ -436,6 +436,9 @@ var ent_prev_phase := 0.0
 var ent_anim_dbg := 0
 var ent_step: AudioStreamPlayer3D = null
 var ent_spawn_delay := 75.0    # v17 : elle dort tant que tu n'as pas touche a une note (ou 75 s)
+# ---- v21 : props animes (horloge a balancier) ----
+var clock_pend: Node3D = null
+var clock_pl: AudioStreamPlayer3D = null
 var creek_sfx_t := 6.0
 # ================= v16 : laisse d'ecoute + discipline de cachette =================
 var heard_pos := Vector2.ZERO
@@ -1173,6 +1176,141 @@ func _build_house() -> void:
 	for pp in [[Vector2(5.0, 4.93), 0], [Vector2(14.0, 9.07), PI], [Vector2(9.95, 0.05), 0]]:
 		var po := _make_poster_xy(pp[0], pp[1])
 		world.add_child(po)
+	# ---- v21 : les 4 props (TV CRT + magnetoscope, poupee, horloge, porte-cles) ----
+	_props_v21(woodm)
+
+
+func _props_v21(woodm: StandardMaterial3D) -> void:
+	# ============ v21 PROP 1 : TV CRT + magnetoscope (salon, sur le buffet) ============
+	var dark := _simple(Color(0.09, 0.085, 0.08), 0.55)
+	var tv := Node3D.new()
+	tv.position = Vector3(4.3, 0.73, 2.6)
+	tv.rotation.y = PI / 2   # ecran tourne vers le canape
+	var body := _box(Vector3(0.52, 0.44, 0.46), dark)
+	tv.add_child(body)
+	var scr := _quad(Vector2(0.36, 0.30), _simple(Color(0.015, 0.02, 0.025), 0.12))
+	scr.position = Vector3(0, 0.02, -0.235)
+	tv.add_child(scr)
+	for k in range(2):
+		var knob := MeshInstance3D.new()
+		var kc := CylinderMesh.new()
+		kc.top_radius = 0.02; kc.bottom_radius = 0.02; kc.height = 0.02
+		knob.mesh = kc
+		knob.material_override = _simple(Color(0.7, 0.7, 0.7), 0.4, 0.6)
+		knob.rotation.x = PI / 2
+		knob.position = Vector3(0.20, 0.10 - k * 0.09, -0.235)
+		tv.add_child(knob)
+	var vcr := _box(Vector3(0.40, 0.07, 0.28), _simple(Color(0.12, 0.12, 0.13), 0.4, 0.3))
+	vcr.position = Vector3(0, 0.26, 0.02)
+	tv.add_child(vcr)
+	var led := _quad(Vector2(0.02, 0.012), _emissive(Color(1.0, 0.1, 0.05), 2.2, ""))
+	led.position = Vector3(0.14, 0.26, -0.125)
+	tv.add_child(led)
+	world.add_child(tv)
+	_furn(Vector3(0.52, 0.52, 0.46), Vector3(4.3, 0.76, 2.6), dark)
+	# ============ v21 PROP 2 : poupee de porcelaine (chambre d'Elise) ============
+	var porc := _simple(Color(0.90, 0.86, 0.82), 0.25)
+	porc.subsurf_scatter_enabled = true
+	porc.subsurf_scatter_strength = 0.25
+	var doll := Node3D.new()
+	doll.position = Vector3(14.6, 0.0, 3.9)
+	doll.rotation.y = 0.5
+	var torso := MeshInstance3D.new()
+	var tc := CylinderMesh.new()
+	tc.top_radius = 0.055; tc.bottom_radius = 0.085; tc.height = 0.20
+	torso.mesh = tc
+	torso.material_override = _simple(Color(0.45, 0.10, 0.12), 0.7)   # robe bordeaux
+	torso.position = Vector3(0, 0.10, 0)
+	doll.add_child(torso)
+	var dhead := MeshInstance3D.new()
+	var hs := SphereMesh.new()
+	hs.radius = 0.075
+	dhead.mesh = hs
+	dhead.material_override = porc
+	dhead.position = Vector3(0, 0.26, 0)
+	dhead.rotation.z = 0.18   # tete penchee, malaise garanti
+	doll.add_child(dhead)
+	for ex in [-1, 1]:
+		var eye := MeshInstance3D.new()
+		var es := SphereMesh.new()
+		es.radius = 0.013
+		eye.mesh = es
+		eye.material_override = _simple(Color(0.02, 0.02, 0.02), 0.15)
+		eye.position = Vector3(ex * 0.030, 0.27, -0.062)
+		dhead.add_child(eye)
+	var hair := MeshInstance3D.new()
+	var hc := SphereMesh.new()
+	hc.radius = 0.079
+	hair.mesh = hc
+	hair.material_override = _simple(Color(0.15, 0.09, 0.05), 0.8)
+	hair.position = Vector3(0, 0.02, 0.02)
+	hair.scale = Vector3(1.0, 0.8, 1.0)
+	dhead.add_child(hair)
+	world.add_child(doll)
+	_furn(Vector3(0.20, 0.34, 0.20), Vector3(14.6, 0.17, 3.9), porc)
+	# ============ v21 PROP 3 : horloge a balancier (couloir, mur nord) ============
+	var woodd := _simple(Color(0.16, 0.10, 0.06), 0.6)
+	var clk := Node3D.new()
+	clk.position = Vector3(7.0, 0.0, 0.30)
+	var cas := _box(Vector3(0.5, 2.0, 0.28), woodd)
+	cas.position = Vector3(0, 1.0, 0)
+	clk.add_child(cas)
+	var dial := _quad(Vector2(0.34, 0.34), _emissive(Color(0.95, 0.88, 0.70), 0.5, ""))
+	dial.position = Vector3(0, 1.62, 0.145)
+	clk.add_child(dial)
+	for ha in [0, PI / 2]:
+		var hand := _quad(Vector2(0.02, 0.13), _simple(Color(0.05, 0.05, 0.05), 0.5))
+		hand.position = Vector3(0, 1.62, 0.15)
+		hand.rotation.z = ha + 0.6
+		clk.add_child(hand)
+	var win := _quad(Vector2(0.28, 0.9), _simple(Color(0.03, 0.02, 0.015), 0.3))
+	win.position = Vector3(0, 0.95, 0.145)
+	clk.add_child(win)
+	var brass := _simple(Color(0.65, 0.45, 0.15), 0.3, 1.0)
+	clock_pend = Node3D.new()
+	clock_pend.position = Vector3(0, 1.35, 0.10)
+	var rod := _box(Vector3(0.02, 0.7, 0.02), brass)
+	rod.position = Vector3(0, -0.35, 0)
+	clock_pend.add_child(rod)
+	var disc := MeshInstance3D.new()
+	var dc := CylinderMesh.new()
+	dc.top_radius = 0.09; dc.bottom_radius = 0.09; dc.height = 0.015
+	disc.mesh = dc
+	disc.material_override = brass
+	disc.rotation.x = PI / 2
+	disc.position = Vector3(0, -0.72, 0)
+	clock_pend.add_child(disc)
+	clk.add_child(clock_pend)
+	world.add_child(clk)
+	_furn(Vector3(0.5, 2.0, 0.28), Vector3(7.0, 1.0, 0.30), woodd)
+	clock_pl = AudioStreamPlayer3D.new()
+	clock_pl.stream = load("res://assets/audio/tick.wav")
+	clock_pl.volume_db = -18.0
+	clock_pl.unit_size = 3.0
+	clock_pl.max_distance = 9.0
+	clock_pl.position = Vector3(7.0, 1.2, 0.6)
+	world.add_child(clock_pl)
+	# ============ v21 PROP 4 : porte-cles pres de la sortie EST ============
+	var hookm := _simple(Color(0.3, 0.3, 0.32), 0.4, 0.8)
+	var hk := Node3D.new()
+	hk.position = Vector3(19.85, 1.5, 8.3)
+	var plate := _box(Vector3(0.03, 0.16, 0.10), woodm)
+	hk.add_child(plate)
+	var ring := MeshInstance3D.new()
+	var rt := TorusMesh.new()
+	rt.inner_radius = 0.025; rt.outer_radius = 0.035
+	ring.mesh = rt
+	ring.material_override = hookm
+	ring.position = Vector3(-0.03, -0.08, 0)
+	ring.rotation.y = PI / 2
+	hk.add_child(ring)
+	for ki in range(2):
+		var kk := _key_model(hookm)
+		kk.scale = Vector3(0.55, 0.55, 0.55)
+		kk.position = Vector3(-0.04, -0.11 - ki * 0.02, ki * 0.02 - 0.01)
+		kk.rotation = Vector3(PI / 2 + 0.25 * ki, 0.4 * ki, 0)
+		hk.add_child(kk)
+	world.add_child(hk)
 
 
 func _make_poster_xy(at: Vector2, ry: float) -> Node3D:
@@ -3633,6 +3771,14 @@ func _process(d: float) -> void:
 		play("heart", -6.0)
 	stam_fill.size.x = 160.0 * stamina
 	dust.emitting = headlamp_on and state == "play"
+	# v21 : balancier de l'horloge + tic-tac audible de pres
+	if clock_pend != null and is_instance_valid(clock_pend):
+		clock_pend.rotation.z = sin(run_time * 2.4) * 0.10
+	if clock_pl != null and is_instance_valid(clock_pl):
+		if state == "play" and not clock_pl.playing:
+			clock_pl.play()
+		elif state != "play" and clock_pl.playing:
+			clock_pl.playing = false
 	if tension_pl != null:
 		if chasing and not tension_pl.playing:
 			tension_pl.play()
