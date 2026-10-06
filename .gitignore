@@ -1,0 +1,6 @@
+# Cache d'import Godot (regenerable en ~45 s par --import) : jamais committe
+.godot/
+# Divers
+*.tmp
+*.log
+/tmp/
