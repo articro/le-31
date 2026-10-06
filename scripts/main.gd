@@ -424,11 +424,11 @@ var rig_sole_k0 := 0.0
 var rig_stuck_t := 0.0
 var rig_stuck_pos := Vector2.ZERO
 const RIG_MODES := {
-	0: {"lean": 0.05, "head_p": 0.10, "arm_x": -0.15, "arm_z": 0.60, "arm_fwd": -0.30, "elbow": -0.30, "sh_up": 0.05, "chest_p": 0.08, "amp": 0.45, "stride": 0.30, "jaw": 0.06},
-	1: {"lean": 0.20, "head_p": -0.05, "arm_x": -0.10, "arm_z": 0.55, "arm_fwd": -0.48, "elbow": -0.60, "sh_up": 0.10, "chest_p": 0.14, "amp": 1.00, "stride": 0.42, "jaw": 0.12},
-	2: {"lean": 0.42, "head_p": -0.14, "arm_x": 0.30, "arm_z": 0.10, "arm_fwd": -1.10, "elbow": -1.00, "sh_up": 0.28, "chest_p": 0.22, "amp": 1.20, "stride": 0.56, "jaw": 0.34},
-	3: {"lean": -0.28, "head_p": 0.26, "arm_x": 0.10, "arm_z": 0.50, "arm_fwd": -0.50, "elbow": -1.30, "sh_up": 0.45, "chest_p": -0.14, "amp": 0.35, "stride": 0.25, "jaw": 0.60},
-	4: {"lean": 0.60, "head_p": 0.12, "arm_x": 0.35, "arm_z": 0.05, "arm_fwd": -1.30, "elbow": -0.50, "sh_up": 0.40, "chest_p": 0.30, "amp": 0.80, "stride": 0.34, "jaw": 0.46},
+	0: {"lean": 0.05, "head_p": 0.10, "arm_x": -0.15, "arm_z": 0.60, "arm_fwd": -0.30, "elbow": -0.30, "sh_up": 0.05, "chest_p": 0.08, "amp": 0.45, "stride": 0.30, "jaw": 0.02},
+	1: {"lean": 0.20, "head_p": -0.05, "arm_x": -0.10, "arm_z": 0.55, "arm_fwd": -0.48, "elbow": -0.60, "sh_up": 0.10, "chest_p": 0.14, "amp": 1.00, "stride": 0.42, "jaw": 0.06},
+	2: {"lean": 0.42, "head_p": -0.14, "arm_x": 0.30, "arm_z": 0.48, "arm_fwd": -1.10, "elbow": -1.00, "sh_up": 0.28, "chest_p": 0.22, "amp": 1.20, "stride": 0.56, "jaw": 0.20},
+	3: {"lean": -0.28, "head_p": 0.26, "arm_x": 0.10, "arm_z": 0.50, "arm_fwd": -0.50, "elbow": -1.30, "sh_up": 0.45, "chest_p": -0.14, "amp": 0.35, "stride": 0.25, "jaw": 0.34},
+	4: {"lean": 0.60, "head_p": 0.12, "arm_x": 0.35, "arm_z": 0.50, "arm_fwd": -1.30, "elbow": -0.50, "sh_up": 0.40, "chest_p": 0.30, "amp": 0.80, "stride": 0.34, "jaw": 0.26},
 }
 var rig_dbg := false
 const ENT_SCALE := 1.191       # v18 : 2,35 m -> 2,80 m (elle doit dominer la piece)
@@ -2546,7 +2546,7 @@ func _build_ui() -> void:
 	title_ctl.add_child(sb)
 	var vtag := Label.new()
 	vtag.name = "Ver"
-	vtag.text = "v20 VISAGE"
+	vtag.text = "v20b MACHOIRE"
 	vtag.position = Vector2(1180, 690)
 	vtag.size = Vector2(180, 24)
 	vtag.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -5025,9 +5025,9 @@ func _anim_entity_rig(nd: Node3D, d: float, tt2: float, p2z: Vector2, mode: int,
 	# --- machoire : ouverte en chasse, avec claquements ; negative = elle descend (mesure)
 	var ouv := float(can["jaw"])
 	if mode == 2:
-		ouv += 0.20 * pow(maxf(0.0, sin(tt2 * 7.0)), 3.0)
+		ouv += 0.10 * pow(maxf(0.0, sin(tt2 * 7.0)), 3.0)
 	elif mode == 3:
-		ouv += 0.12 * absf(sin(tt2 * 9.0))
+		ouv += 0.08 * absf(sin(tt2 * 9.0))
 	_rig_pose(sk, "jaw", [[Vector3(1, 0, 0), -ouv]])
 	# --- bras : balancier oppose aux jambes + pose de chasse (mains vers l'avant)
 	for side in ["L", "R"]:

@@ -1,4 +1,4 @@
-# LE 31 — v20 « VISAGE »
+# LE 31 — v20 « VISAGE » puis v20b « MÂCHOIRE »
 
 > Version consacrée **uniquement à la créature**, comme demandé. Objectif : qu'au lancement on voie un monstre crédible.
 > HUD : **`v20 VISAGE`** en haut à droite. **Si tu ne lis pas ce texte, tu joues une vieille version.**
@@ -85,3 +85,44 @@ signe sur le lacet des épaules). Corrigé : **les deux bras se tendent vers toi
 ## Reproduire
 
 Tout est reproductible : `tools/rig_monstre.py` (squelette + poids de sommets), `tools/skin_tex.py` (peau et visage peints en UV), `tools/sole_extract.py` (points de contact des pieds), `tools/anim_ref.py` (animation, portée à l'identique dans le jeu), `tools/anim_check.py` (mesures et rendus).
+
+
+---
+
+# v20b « MÂCHOIRE » (correctif de la v20)
+
+La v20 avait un visage, mais bouche fermée : muet, sans dents. La v20b lui donne une mâchoire
+qui bouge et une bouche noire.
+
+## Ce qui change
+
+- **Os `jaw`** (22 os au total) : le bas du visage suit la mâchoire. Le menton descend quand la
+  bouche s'ouvre — vérifié au rapporteur : 0,34 rad = 20°.
+- **10 dents** (5 en haut, 5 en bas) et **une cavité buccale** peinte en noir : la bouche ouverte
+  n'est plus un trou dans la peau.
+- **Placement mesuré, pas deviné** : un test automatique (`tools/test_dents.py`) vérifie que
+  *aucune* dent ne dépasse la peau du visage. Résultat : **0 dent visible / 70**.
+  Les dents sont plantées 1,1 cm en retrait ; la bouche au repos paraît fermée.
+- **Ouverture animée** : 2° en rôde, 6° en alerte, 20° en chasse (avec des claquements rapides),
+  34° quand il recule en hurlant, 26° au bond.
+- **Bras resserrés en chasse et au bond** : ils pendaient écartés de 40° sous les épaules
+  (le « monstre qui écarte les bras bizarrement »). Ils tombent maintenant le long du corps,
+  tendus vers l'avant. C'est plus proche d'une démarche de prédateur.
+- **Deux bugs corrigés dans le générateur** : la cavité buccale n'était jamais ajoutée au maillage
+  (7 sommets perdus, 6 triangles pointant dans le vide) et le décalage des dents s'appliquait
+  après l'assemblage — donc jamais. Les deux sont réparés et contrôlés par le test.
+
+## Mesures
+
+```
+--dbg=rig    os=22 · triangles 99 983 · pénétration du pied -0,008 m · patinage 2,5 cm/image
+--dbg=audit  AUDIT ALL OK
+--dbg=m2     RIG SKINNE os=22 tri=99983
+--dbg=mvis   37/37 points, 7,3°, occultation 0
+```
+
+## Correctifs v18/v19 toujours en place
+
+Plein écran, HUD allégé, inventaire (touche **I**), décor enrichi, monstre rôdant dans le menu,
+sons refaits, créature skinnée (maillage continu), IK des jambes sans patinage, tête qui te suit,
+déclic anti-blocage, **escalier du garage accessible**.
