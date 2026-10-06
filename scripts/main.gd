@@ -62,7 +62,7 @@ const TR := {
 		"how_1": "1. La maison est SOMBRE : ta lampe torche (G) est ta meilleure amie. La sortie est à l'EST — mais elle est VERROUILLÉE : trouve la clé dorée (position différente à chaque partie).",
 		"how_2": "2. ELLE est aveugle mais entend tes pas, et elle MARCHE et COURT comme une bête. Courir = du bruit = elle te traque. Le plancher grince par endroits.",
 		"how_3": "3. Bonbons (5) : E = diversion, F = piège de sucre collant qui la ralentit. Une 2e clé ouvre la chambre verrouillée (bonbon + placard à l'intérieur).",
-		"how_4": "4. 4 CACHETTES où elle ne peut rien : placards (chambres, garage) et renfoncement de l'escalier. L'escalier raide du garage monte à l'ÉTAGE : une pièce de plus à fouiller — elle entend mal à travers le plancher.",
+		"how_4": "4. 4 CACHETTES où elle ne peut rien : placards (chambres, garage) et renfoncement de l'escalier. L'escalier raide du garage monte à l'ÉTAGE, et un second escalier monte au GRENIER — elle entend mal à travers les planchers. Les portes s'ouvrent avec R, mais elles grincent… et elle les enfonce quand elle chasse.",
 		"how_5": "5. Si elle te touche : tu te réveilles à l'entrée (3 points d'apparition aléatoires). 3 prises = c'est fini. Sors vivant.",
 		"obj_banner": "BUT : traverse si rien n'a changé · demi-tour si changé · 5 tours = sortie",
 		"hint_move": "ZQSD / WASD + SOURIS pour regarder · MAJ pour courir",
@@ -110,7 +110,7 @@ const TR := {
 		"note_3": "NOTE 3/5 : « La clé dorée change de place chaque nuit. Je l'ai vue à l'étage. »",
 		"note_4": "NOTE 4/5 : « Si tu l'entends renifler, accroupis-toi. Elle ne voit rien du tout. »",
 		"note_5": "NOTE 5/5 : « Si tu lis ceci, on se retrouve dehors. Cours. »",
-		"obj_short": "porte EST VERROUILLÉE : trouve la clé dorée · marche doucement · C = s'accroupir · E = bonbon · F = piège collant",
+		"obj_short": "porte EST VERROUILLÉE : trouve la clé dorée · marche doucement · C = s'accroupir · E = bonbon · F = piège collant · R = ouvrir/fermer les portes",
 		"how_go": "C'EST PARTI",
 		"candy_title": "BONBON MAUDIT GAGNÉ — choisis : ",
 		"candy_got": "Tu gardes : %s",
@@ -231,7 +231,7 @@ const TR := {
 		"note_3": "NOTE 3/5: \"The golden key moves every night. I saw it upstairs.\"",
 		"note_4": "NOTE 4/5: \"If you hear her sniffing, crouch. She sees nothing at all.\"",
 		"note_5": "NOTE 5/5: \"If you read this, meet me outside. Run.\"",
-		"obj_short": "EAST door LOCKED: find the golden key · walk softly · C = crouch · E = candy · F = sticky trap",
+		"obj_short": "EAST door LOCKED: find the golden key · walk softly · C = crouch · E = candy · F = sticky trap · R = open/close doors",
 		"how_go": "LET'S GO",
 		"candy_title": "CURSED CANDY EARNED — pick: ",
 		"candy_got": "You keep: %s",
@@ -408,7 +408,7 @@ void fragment() {
 # ================= v15 : monstre a 6 parties (T-pose, bras animes) =================
 var ent_model_kind := 2        # 2 = v17 (10 parties) · 1 = v15 (6) · 0 = v13 (4)
 # ---- v19 : creature skinee (monstre_rig.glb, 21 os, peau continue) ----
-var rig_enabled := false   # v21c : procedural texture PAR DEFAUT (rendu fiable, valide v9-v12) ; F3 = bascule vers le rig skinne
+var rig_enabled := true   # v23 : LE MONSTRE IMPORTE (monstre_rig.glb, rig skinne) PAR DEFAUT — demande utilisateur ; F3 = bascule procedural
 var rig_state := {}            # instance_id -> {skel, mesh, gait, can, fil}
 var rig_scale := 2.20   # v21c : rig skinne (option F3) aligne sur 2,20 m
 var rig_y_hip := 0.4154
@@ -424,6 +424,21 @@ var rig_sole_k0 := 0.0
 var rig_stuck_t := 0.0
 var rig_stuck_pos := Vector2.ZERO
 var ent_ghost_t := 0.0   # v22d : bloquee -> traverse murs/props droit vers toi (demande utilisateur)
+# ---- v23 : patterns FNAF (abstraits) + portes ouvrables + porte sortie eteinte + grenier ----
+var ent_freeze_t := 0.0    # figee sous ton regard (Freddy/Boo)
+var ent_notseen_t := 0.0   # temps sans etre regardee
+var ent_dash_t := 0.0      # sprint Foxy quand tu ne la regardes plus
+var ent_flank_side := 1.0  # contournement gauche/droite (Bonnie/Chica)
+var ent_flank_cd := 6.0
+var opendoors: Array = []  # {pivot, col, th0, th1, open, pos}
+var door_pl: AudioStreamPlayer3D = null
+var exit_glow_mat: StandardMaterial3D = null
+var exit_light: OmniLight3D = null
+var stair2_t := -1.0       # escalier etage -> grenier
+var stair2_cd := 0.0
+var stair2_dir := 1
+var attic_pl: AudioStreamPlayer = null
+var wing_pl: AudioStreamPlayer = null
 const RIG_MODES := {
 	0: {"lean": 0.05, "head_p": 0.10, "arm_x": -0.15, "arm_z": 0.60, "arm_fwd": -0.30, "elbow": -0.30, "sh_up": 0.05, "chest_p": 0.08, "amp": 0.45, "stride": 0.30, "jaw": 0.02},
 	1: {"lean": 0.20, "head_p": -0.05, "arm_x": -0.10, "arm_z": 0.55, "arm_fwd": -0.48, "elbow": -0.60, "sh_up": 0.10, "chest_p": 0.14, "amp": 1.00, "stride": 0.42, "jaw": 0.06},
@@ -685,11 +700,11 @@ const H_D := 14.0
 const WALL_H := 2.9
 const WALL_T := 0.3
 var spawn_pos := Vector2(1.2, 7.0)
-var exit_pos := Vector2(19.7, 7.0)
-const NODES := [Vector2(2, 7), Vector2(10, 7), Vector2(17.5, 7), Vector2(3.5, 3), Vector2(10, 2.8), Vector2(16.5, 3), Vector2(4.5, 9.3), Vector2(8, 11), Vector2(12.5, 11), Vector2(17.5, 11), Vector2(1.5, 7.5), Vector2(9.0, 5.0), Vector2(16.0, 7.0), Vector2(1.5, 12.9)]
-const EDGES := [[0, 1], [1, 2], [0, 3], [1, 4], [2, 5], [0, 6], [1, 7], [1, 8], [2, 9], [6, 13], [13, 10], [10, 11], [10, 12]]
-const NODE_LVL := [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0]
-const LEVEL_Y := [0.0, 2.98]
+var exit_pos := Vector2(29.7, 7.0)
+const NODES := [Vector2(2, 7), Vector2(10, 7), Vector2(17.5, 7), Vector2(3.5, 3), Vector2(10, 2.8), Vector2(16.5, 3), Vector2(4.5, 9.3), Vector2(8, 11), Vector2(12.5, 11), Vector2(17.5, 11), Vector2(1.5, 7.5), Vector2(9.0, 5.0), Vector2(16.0, 7.0), Vector2(1.5, 12.9), Vector2(22.4, 3.4), Vector2(27.0, 7.0), Vector2(23.0, 11.0)]
+const EDGES := [[0, 1], [1, 2], [0, 3], [1, 4], [2, 5], [0, 6], [1, 7], [1, 8], [2, 9], [6, 13], [13, 10], [10, 11], [10, 12], [2, 15], [14, 15], [15, 16]]
+const NODE_LVL := [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0]
+const LEVEL_Y := [0.0, 2.98, 5.38]
 const RAMP_RECT := [Vector2(0.9, 7.4), Vector2(2.1, 12.5)]
 const CANDY_SPOTS := [Vector3(9.5, 0, 3.5), Vector3(2.2, 0, 1.2), Vector3(14, 0, 13), Vector3(1.2, 0, 12.5), Vector3(16.2, 2.98, 11.5)]
 const CREEK_ZONES := [Vector3(5.5, 6.1, 0.6), Vector3(12.0, 7.9, 0.6), Vector3(10.3, 4.4, 0.6), Vector3(2.6, 2.2, 0.6), Vector3(13.4, 12.2, 0.6)]
@@ -772,10 +787,16 @@ func _node_of(p: Vector2, lvl := -1) -> int:
 
 
 func _terrain_y(p: Vector2, lvl: int) -> float:
+	if lvl == 2:
+		# v23 : rampe de l'escalier etage -> grenier (x 3.2-4.4, z 8.3-12.4)
+		if p.x >= 3.1 and p.x <= 4.5 and p.y >= 8.2 and p.y <= 12.45:
+			var idx2 := int(floor((12.35 - p.y) / 0.2))
+			return clampf(2.98 + idx2 * 0.124, 2.98, 5.38)
+		return LEVEL_Y[2]
 	if p.x >= RAMP_RECT[0].x and p.x <= RAMP_RECT[1].x and p.y >= RAMP_RECT[0].y and p.y <= RAMP_RECT[1].y:
 		var idx := int(floor((12.4 - p.y) / 0.2146))
 		return clampf(idx * 0.124, 0.0, 2.98)
-	return LEVEL_Y[lvl]
+	return LEVEL_Y[clampi(lvl, 0, 2)]
 
 
 func _bfs_path(a: int, b: int) -> Array:
@@ -860,22 +881,26 @@ func _furn(sz: Vector3, at: Vector3, m: StandardMaterial3D, rot_y := 0.0, rot_x 
 
 
 func _door_panel(at: Vector2, side: float) -> void:
+	# v23 : porte SUR PIVOT — ouvrable au clavier (R), grince, et ELLE les enfonce en chasse
 	var wood := _pbr("door")
-	var b := _box(Vector3(0.9, 2.1, 0.07), wood)
 	var hinge := Vector2(at.x + side * 0.72, at.y)
 	var th := 1.52 * (1.0 if side > 0 else -1.0)
-	b.position = Vector3(hinge.x + cos(th) * 0.45, 1.05, hinge.y - sin(th) * 0.45)
-	b.rotation = Vector3(0, th, 0)
-	world.add_child(b)
+	var pv := Node3D.new()
+	pv.position = Vector3(hinge.x, 0, hinge.y)
+	pv.rotation = Vector3(0, th, 0)
+	world.add_child(pv)
+	var b := _box(Vector3(0.9, 2.1, 0.07), wood)
+	b.position = Vector3(0.45, 1.05, 0)
+	pv.add_child(b)
 	var col := StaticBody3D.new()
 	var cs := CollisionShape3D.new()
 	var bs := BoxShape3D.new()
 	bs.size = Vector3(0.9, 2.1, 0.09)
 	cs.shape = bs
 	col.add_child(cs)
-	col.position = b.position
-	col.rotation = Vector3(0, th, 0)
-	world.add_child(col)
+	col.position = Vector3(0.45, 1.05, 0)
+	pv.add_child(col)
+	opendoors.append({"pivot": pv, "th0": th, "th1": th - side * 1.55, "open": false, "pos": Vector2(at.x, at.y), "slammed": false})
 	var fr := _simple(Color(0.13, 0.09, 0.06), 0.55)
 	for sd in [-1, 1]:
 		var j2 := _box(Vector3(0.10, 2.3, 0.10), fr)
@@ -891,8 +916,46 @@ func _door_panel(at: Vector2, side: float) -> void:
 		world.add_child(jc)
 	var poig := _simple(Color(0.35, 0.3, 0.2), 0.3, 0.8)
 	var pg := _box(Vector3(0.03, 0.12, 0.03), poig)
-	pg.position = Vector3(b.position.x - cos(th) * 0.38 * 0.9, 1.05, b.position.z + sin(th) * 0.38 * 0.9)
+	pg.position = Vector3(hinge.x + cos(th) * 0.108, 1.05, hinge.y - sin(th) * 0.108)
 	world.add_child(pg)
+
+
+func _ensure_door_pl() -> void:
+	if door_pl == null:
+		door_pl = AudioStreamPlayer3D.new()
+		door_pl.stream = load("res://assets/audio/door_creak.wav")
+		door_pl.volume_db = -6.0
+		door_pl.unit_size = 6.0
+		door_pl.max_distance = 18.0
+		add_child(door_pl)
+
+
+func _try_door() -> void:
+	# v23 : R = ouvrir/fermer la porte la plus proche (grincement audible)
+	if state != "play" or hidden:
+		return
+	_ensure_door_pl()
+	var pp := Vector2(player.position.x, player.position.z)
+	var best := -1
+	var bd := 2.1
+	for i in range(opendoors.size()):
+		var dd: float = (opendoors[i]["pos"] - pp).length()
+		if dd < bd:
+			bd = dd
+			best = i
+	if best < 0:
+		return
+	var dr: Dictionary = opendoors[best]
+	var pv: Node3D = dr["pivot"]
+	var target: float = dr["th1"] if not dr["open"] else dr["th0"]
+	dr["open"] = not dr["open"]
+	dr["slammed"] = false
+	var tw := create_tween()
+	tw.tween_property(pv, "rotation:y", target, 0.55).set_trans(Tween.TRANS_SINE)
+	if door_pl != null:
+		door_pl.position = Vector3(dr["pos"].x, 1.1, dr["pos"].y)
+		door_pl.pitch_scale = randf_range(0.85, 1.15)
+		door_pl.play()
 
 func _build_house() -> void:
 	var fw := _pbr("floor")
@@ -914,8 +977,8 @@ func _build_house() -> void:
 	_wall_seg(0, 0, 20, 0)
 	_wall_seg(0, 14, 20, 14)
 	_wall_seg(0, 0, 0, 14)
-	_wall_seg(20, 0, 20, 6.2)
-	_wall_seg(20, 7.8, 20, 14)
+	_wall_seg(20, 0, 20, 5.4)    # v23 : ouverture elargie vers l'aile est
+	_wall_seg(20, 8.6, 20, 14)
 	# mur nord intérieur z=5.0 (3 portes larges 1.6 m)
 	_wall_seg(0, 5.0, 2.75, 5.0)
 	_wall_seg(4.35, 5.0, 9.25, 5.0)
@@ -997,6 +1060,70 @@ func _build_house() -> void:
 		for wx in [2.9, 5.5]:
 			_furn(Vector3(0.7, 0.7, 0.25), Vector3(wx, 0.35, wz), _simple(Color(0.05, 0.05, 0.05), 0.8))
 	_furn(Vector3(0.5, 2.0, 3.4), Vector3(6.0, 1.0, 11.5), woodm)
+	# ================= v23 : AILE EST — la maison s'agrandit (tres grande maison) =================
+	_room_floor(20, 0, 30, 5.0, fw)
+	_room_floor(20, 5.0, 30, 9.0, fw)
+	_room_floor(20, 9.0, 30, 14, fw)
+	_wall_seg(20, 0, 30, 0)
+	_wall_seg(20, 14, 30, 14)
+	_wall_seg(30, 0, 30, 6.2)
+	_wall_seg(30, 7.8, 30, 14)
+	# cloison bibliotheque / chambre d'enfant (large ouverture centrale)
+	_wall_seg(25, 0, 25, 6.0)
+	_wall_seg(25, 8.0, 25, 14)
+	for jp2 in [Vector2(30, 0), Vector2(30, 14), Vector2(25, 0), Vector2(25, 14), Vector2(25, 6.0), Vector2(25, 8.0)]:
+		var pil2 := _box(Vector3(0.42, WALL_H, 0.42), _pbr("wall"))
+		pil2.position = Vector3(jp2.x, WALL_H / 2.0, jp2.y)
+		world.add_child(pil2)
+		var pc2 := StaticBody3D.new()
+		var pcs2 := CollisionShape3D.new()
+		var pbs2 := BoxShape3D.new()
+		pbs2.size = Vector3(0.42, WALL_H, 0.42)
+		pcs2.shape = pbs2
+		pc2.add_child(pcs2)
+		pc2.position = pil2.position
+		world.add_child(pc2)
+	# toit de l'aile (plafond du rez)
+	var wing_roof := _box(Vector3(10.4, 0.16, 14.6), _pbr("ceil"))
+	wing_roof.position = Vector3(25.1, 2.98, 7.0)
+	world.add_child(wing_roof)
+	# bibliotheque (ouest de l'aile) — props CC0 v23
+	_cc0("res://assets/cc0/bookcaseClosedWide.obj", Vector3(20.7, 0, 2.2), PI / 2, 0.16)
+	_cc0("res://assets/cc0/bookcaseClosedWide.obj", Vector3(20.7, 0, 4.0), PI / 2, 0.16)
+	_cc0("res://assets/cc0/bookcaseOpen.obj", Vector3(20.7, 0, 10.6), PI / 2, 0.2)
+	_cc0("res://assets/cc0/bookcaseOpen.obj", Vector3(24.3, 0, 12.6), PI, 0.2)
+	_cc0("res://assets/cc0/desk.obj", Vector3(23.4, 0, 2.0), PI, 0.17)
+	_cc0("res://assets/cc0/chairDesk.obj", Vector3(23.4, 0, 3.0), 0.0, 0.17)
+	_cc0("res://assets/cc0/laptop.obj", Vector3(23.4, 0.78, 2.1), PI, 0.10, false)
+	_cc0("res://assets/cc0/lampSquareFloor.obj", Vector3(20.6, 0, 0.7), 0.0, 0.174, false)
+	_cc0("res://assets/cc0/books.obj", Vector3(22.2, 0, 4.6), 0.7, 0.22, false)
+	_cc0("res://assets/cc0/books.obj", Vector3(21.4, 0, 11.9), 1.9, 0.22, false)
+	_cc0("res://assets/cc0/rugRectangle.obj", Vector3(22.5, 0.02, 7.0), 0.0, 0.20, false)
+	# chambre d'enfant (est de l'aile, pres de la sortie)
+	_cc0("res://assets/cc0/bedBunk.obj", Vector3(28.7, 0, 2.2), PI / 2, 0.16)
+	_cc0("res://assets/cc0/bear.obj", Vector3(26.2, 0, 1.0), 0.6, 0.11)
+	_cc0("res://assets/cc0/sideTableDrawers.obj", Vector3(26.1, 0, 3.2), PI / 2, 0.103)
+	_cc0("res://assets/cc0/lampRoundTable.obj", Vector3(26.1, 0.42, 3.2), 0.0, 0.09, false)
+	_cc0("res://assets/cc0/pillow.obj", Vector3(28.4, 0, 5.2), 0.4, 0.14, false)
+	_cc0("res://assets/cc0/pillow.obj", Vector3(27.6, 0, 5.6), 2.2, 0.14, false)
+	_cc0("res://assets/cc0/tableRound.obj", Vector3(27.0, 0, 9.6), 0.0, 0.17)
+	_cc0("res://assets/cc0/chairRounded.obj", Vector3(28.0, 0, 9.9), -1.2, 0.16)
+	_cc0("res://assets/cc0/benchCushion.obj", Vector3(29.3, 0, 11.2), PI / 2, 0.18)
+	_cc0("res://assets/cc0/cardboardBoxClosed.obj", Vector3(29.1, 0, 13.2), 0.3, 0.16)
+	_cc0("res://assets/cc0/pottedPlant.obj", Vector3(29.3, 0, 0.6), 0.0, 0.20, false)
+	# lampes de l'aile (une allumee, deux grillees)
+	var wl_i := 0
+	for wl in [Vector2(22.5, 3.0), Vector2(22.5, 11.0), Vector2(27.5, 7.0)]:
+		world.add_child(_make_lamp(Vector3(wl.x, 0, wl.y), wl_i == 2))
+		wl_i += 1
+	# ---- v23 : plus de props CC0 dans l'ancienne maison ----
+	_cc0("res://assets/cc0/loungeChairRelax.obj", Vector3(5.6, 0, 4.5), -PI / 2, 0.18)
+	_cc0("res://assets/cc0/coatRackStanding.obj", Vector3(19.3, 0, 9.5), 0.4, 0.19, false)
+	_cc0("res://assets/cc0/kitchenBlender.obj", Vector3(9.2, 0.78, 3.4), 0.9, 0.09, false)
+	_cc0("res://assets/cc0/kitchenCoffeeMachine.obj", Vector3(9.8, 0.78, 3.6), 2.4, 0.09, false)
+	_cc0("res://assets/cc0/kitchenMicrowave.obj", Vector3(8.7, 0.78, 3.7), 1.2, 0.09, false)
+	_cc0("res://assets/cc0/shower.obj", Vector3(19.2, 0, 3.9), PI, 0.14)
+	_cc0("res://assets/cc0/cabinetBedDrawer.obj", Vector3(11.0, 0, 13.7), PI, 0.15)
 	# escalier du garage -> ÉTAGE (rampe physique + marches déco)
 	var ramp_len := sqrt(5.15 * 5.15 + 2.98 * 2.98)
 	var ramp_ang := atan2(2.98, 5.15)
@@ -1026,6 +1153,27 @@ func _build_house() -> void:
 		rail.position = Vector3(rx, 1.49 + 0.42, 9.92)
 		rail.rotation = Vector3(ramp_ang, 0, 0)
 		world.add_child(rail)
+	# ---- v23 : 2e escalier, ÉTAGE -> GRENIER (la maison gagne un niveau) ----
+	var ramp2_len := sqrt(4.0 * 4.0 + 2.4 * 2.4)
+	var ramp2_ang := atan2(2.4, 4.0)
+	for sx2 in [3.26, 4.34]:
+		var str2 := _box(Vector3(0.08, 0.60, ramp2_len + 0.7), woodm)
+		str2.position = Vector3(sx2, 2.98 + 1.08, 10.3)
+		str2.rotation = Vector3(ramp2_ang, 0, 0)
+		world.add_child(str2)
+	_collider_ramp(Vector3(1.1, 0.16, ramp2_len), Vector3(3.8, 4.18, 10.3), ramp2_ang)
+	for st2 in range(20):
+		var s2z := 12.25 - st2 * 0.2
+		var s2y := 2.98 + (st2 + 1) * 0.124 - 0.062
+		_furn(Vector3(1.1, 0.124, 0.24), Vector3(3.8, s2y, s2z), woodm)
+		var ris2 := _box(Vector3(1.1, 0.124, 0.04), woodm)
+		ris2.position = Vector3(3.8, s2y, s2z + 0.12)
+		world.add_child(ris2)
+	for rx2 in [3.28, 4.32]:
+		var rail2 := _box(Vector3(0.06, 0.5, ramp2_len), woodm)
+		rail2.position = Vector3(rx2, 4.18 + 0.42, 10.3)
+		rail2.rotation = Vector3(ramp2_ang, 0, 0)
+		world.add_child(rail2)
 	# dalle de l'étage (trémie au-dessus de la rampe) + murs hauts + toit
 	var slabm := _pbr("ceil")
 	for sp in [Vector3(0.4, 2.9, 7.0), Vector3(11.1, 2.9, 7.0), Vector3(1.5, 2.9, 3.45), Vector3(1.5, 2.9, 11.05)]:
@@ -1038,25 +1186,48 @@ func _build_house() -> void:
 	var upw := _pbr("wall")
 	for uw in [Vector3(20.0, 2.22, 0.3), Vector3(20.0, 2.22, 0.3), Vector3(0.3, 2.22, 14.0), Vector3(0.3, 2.22, 14.0)]:
 		pass
-	var uw1 := _box(Vector3(20.6, 2.22, 0.3), upw)
-	uw1.position = Vector3(10.0, 4.09, 0.0)
+	# v23 : murs de l'etage montent jusqu'au grenier (2,98 -> 7,60)
+	var uw1 := _box(Vector3(20.6, 4.62, 0.3), upw)
+	uw1.position = Vector3(10.0, 5.29, 0.0)
 	world.add_child(uw1)
-	_furn(Vector3(20.6, 2.22, 0.3), Vector3(10.0, 4.09, 0.0), upw)
-	var uw2 := _box(Vector3(20.6, 2.22, 0.3), upw)
-	uw2.position = Vector3(10.0, 4.09, 14.0)
+	_furn(Vector3(20.6, 4.62, 0.3), Vector3(10.0, 5.29, 0.0), upw)
+	var uw2 := _box(Vector3(20.6, 4.62, 0.3), upw)
+	uw2.position = Vector3(10.0, 5.29, 14.0)
 	world.add_child(uw2)
-	_furn(Vector3(20.6, 2.22, 0.3), Vector3(10.0, 4.09, 14.0), upw)
-	var uw3 := _box(Vector3(0.3, 2.22, 14.6), upw)
-	uw3.position = Vector3(0.0, 4.09, 7.0)
+	_furn(Vector3(20.6, 4.62, 0.3), Vector3(10.0, 5.29, 14.0), upw)
+	var uw3 := _box(Vector3(0.3, 4.62, 14.6), upw)
+	uw3.position = Vector3(0.0, 5.29, 7.0)
 	world.add_child(uw3)
-	_furn(Vector3(0.3, 2.22, 14.6), Vector3(0.0, 4.09, 7.0), upw)
-	var uw4 := _box(Vector3(0.3, 2.22, 14.6), upw)
-	uw4.position = Vector3(20.0, 4.09, 7.0)
+	_furn(Vector3(0.3, 4.62, 14.6), Vector3(0.0, 5.29, 7.0), upw)
+	var uw4 := _box(Vector3(0.3, 4.62, 14.6), upw)
+	uw4.position = Vector3(20.0, 5.29, 7.0)
 	world.add_child(uw4)
-	_furn(Vector3(0.3, 2.22, 14.6), Vector3(20.0, 4.09, 7.0), upw)
+	_furn(Vector3(0.3, 4.62, 14.6), Vector3(20.0, 5.29, 7.0), upw)
 	var roof := _box(Vector3(20.6, 0.2, 14.6), _pbr("ceil"))
-	roof.position = Vector3(10.0, 5.3, 7.0)
+	roof.position = Vector3(10.0, 7.7, 7.0)
 	world.add_child(roof)
+	# ---- v23 : plancher du GRENIER (y 5,38) avec tremie au-dessus de l'escalier ----
+	for gp in [Vector4(1.5, 5.3, 7.0, 0), Vector4(12.3, 5.3, 7.0, 1), Vector4(3.8, 5.3, 4.0, 2), Vector4(3.8, 5.3, 13.3, 3)]:
+		var gw := 3.0 if gp.w == 0 else (15.4 if gp.w == 1 else 1.6)
+		var gd := 14.0 if gp.w <= 1 else (8.0 if gp.w == 2 else 1.4)
+		var gsl := _box(Vector3(gw, 0.16, gd), slabm)
+		gsl.position = Vector3(gp.x, gp.y, gp.z)
+		world.add_child(gsl)
+		_furn(Vector3(gw, 0.16, gd), Vector3(gp.x, gp.y, gp.z), slabm)
+	# props du grenier : cartons, ours, lumiere mourante
+	_cc0("res://assets/cc0/cardboardBoxClosed.obj", Vector3(7.0, 5.38, 3.0), 0.4, 0.16)
+	_cc0("res://assets/cc0/cardboardBoxOpen.obj", Vector3(7.7, 5.38, 3.4), 1.7, 0.16)
+	_cc0("res://assets/cc0/cardboardBoxClosed.obj", Vector3(7.35, 5.83, 3.2), 0.9, 0.13)
+	_cc0("res://assets/cc0/cardboardBoxClosed.obj", Vector3(15.5, 5.38, 12.4), 2.2, 0.16)
+	_cc0("res://assets/cc0/bear.obj", Vector3(13.0, 5.38, 2.0), 2.8, 0.11)
+	_cc0("res://assets/cc0/lampRoundTable.obj", Vector3(9.5, 5.38, 12.5), 0.0, 0.09, false)
+	var gl := OmniLight3D.new()
+	gl.light_color = Color(0.85, 0.7, 0.5)
+	gl.light_energy = 1.4
+	gl.omni_range = 6.0
+	gl.position = Vector3(10.0, 7.0, 7.0)
+	gl.shadow_enabled = false
+	world.add_child(gl)
 	# cloison de l'étage (porte au centre) + linteau
 	var pw1 := _box(Vector3(0.2, 2.22, 5.9), upw)
 	pw1.position = Vector3(12.5, 4.09, 3.25)
@@ -1125,15 +1296,19 @@ func _build_house() -> void:
 	# porte de sortie (panneau fermé + panneau EXIT lumineux)
 	exit_door = Node3D.new()
 	exit_door.position = Vector3(exit_pos.x + 0.2, 0, exit_pos.y)
-	var eq := _quad(Vector2(1.15, 2.2), _emissive(Color(1, 0.85, 0.55), 0.5, "res://assets/tex/exit.png"))
+	# v23 : porte de sortie ETEINTE — elle ne s'illumine QUE quand on sort enfin (demande utilisateur)
+	var eqm := _emissive(Color(0.15, 0.12, 0.09), 0.0, "res://assets/tex/exit.png")
+	exit_glow_mat = eqm
+	var eq := _quad(Vector2(1.15, 2.2), eqm)
 	eq.rotation = Vector3(PI / 2, 0, PI / 2)
 	eq.position = Vector3(0, 1.1, 0)
 	exit_door.add_child(eq)
 	var el := OmniLight3D.new()
 	el.light_color = Color(1.0, 0.8, 0.5)
-	el.light_energy = 3.0
+	el.light_energy = 0.0
 	el.omni_range = 5.0
 	el.position = Vector3(-0.4, 1.6, 0)
+	exit_light = el
 	exit_door.add_child(el)
 	world.add_child(exit_door)
 	var exit_col := StaticBody3D.new()
@@ -1142,8 +1317,19 @@ func _build_house() -> void:
 	var ecs := CollisionShape3D.new()
 	ecs.shape = ebs
 	exit_col.add_child(ecs)
-	exit_col.position = Vector3(20.0, WALL_H / 2.0, 7.0)
+	exit_col.position = Vector3(30.0, WALL_H / 2.0, 7.0)
 	world.add_child(exit_col)
+	# v23 : nappes sonores longues (grenier / aile est)
+	attic_pl = AudioStreamPlayer.new()
+	attic_pl.stream = load("res://assets/audio/attic_loop.wav")
+	attic_pl.volume_db = -80.0
+	attic_pl.autoplay = true
+	add_child(attic_pl)
+	wing_pl = AudioStreamPlayer.new()
+	wing_pl.stream = load("res://assets/audio/wing_loop.wav")
+	wing_pl.volume_db = -80.0
+	wing_pl.autoplay = true
+	add_child(wing_pl)
 	# cachettes : placard ch2, alcôve garage (sous escalier = renfoncement naturel)
 	var plankm := _pbr("wall")
 	for hp in [Vector2(15.8, 9.0), Vector2(3.0, 9.0)]:
@@ -2156,7 +2342,7 @@ func _decor_rich() -> void:
 	for i in range(5):
 		_cc0("res://assets/cc0/cardboardBoxClosed.obj", Vector3(6.3 + float(i % 3) * 0.55, 2.98, 3.0 + float(i % 4) * 0.5), float(i) * 0.31, 0.16, i < 3)
 	for i2 in range(3):
-		_cc0("res://assets/cc0/cardboardBoxClosed.obj" if i2 % 2 == 0 else "res://assets/cc0/cardboardBoxOpen.obj", Vector3(2.2 + float(i2) * 0.55, 0.0, 12.2 - float(i2 % 3) * 0.5), float(i2) * 0.5, 0.16)
+		_cc0("res://assets/cc0/cardboardBoxClosed.obj" if i2 % 2 == 0 else "res://assets/cc0/cardboardBoxOpen.obj", Vector3(4.4 + float(i2) * 0.55, 0.0, 13.4 - float(i2 % 3) * 0.45), float(i2) * 0.5, 0.16)
 	_cc0("res://assets/cc0/trashcan.obj", Vector3(3.5, 0, 12.2), 0.4, 0.117)
 	_cc0("res://assets/cc0/washer.obj", Vector3(5.9, 0, 13.3), PI, 0.19, true)
 	# --- BOUTEILLES et BOCAUX (cuisine, au sol contre le mur) ---
@@ -2303,6 +2489,33 @@ func _bfs_pts(a: int, b: int) -> Array:
 	return pts
 
 
+func _ent_looked_at() -> bool:
+	# v23 : vrai test de regard — la camera pointe vers elle (angle < ~56 degres, < 16 m)
+	if entity == null or not is_instance_valid(entity) or not entity.visible:
+		return false
+	if state != "play":
+		return false
+	var fwd := Vector3(-sin(yaw), 0, -cos(yaw))
+	var to := entity.position - player.position
+	to.y = 0.0
+	var dd := to.length()
+	if dd > 16.0 or dd < 0.01:
+		return false
+	if fwd.dot(to / dd) <= 0.55:
+		return false
+	# v23 : ligne de vue reelle — un mur entre elle et toi = elle n'est pas "regardee"
+	var eye := player.position + Vector3(0, 1.5, 0)
+	var tgt := entity.position + Vector3(0, 1.3, 0)
+	var space := get_world_3d().direct_space_state
+	var q := PhysicsRayQueryParameters3D.create(eye, tgt)
+	q.collision_mask = 1
+	q.exclude = [player.get_rid()]
+	var h := space.intersect_ray(q)
+	if not h.is_empty() and (h["position"] - eye).length() < (tgt - eye).length() - 0.35:
+		return false
+	return true
+
+
 func _move_entity_toward(target2: Vector2, spd: float, d: float, tlvl := -1) -> void:
 	if ent_glued:
 		spd *= 0.4
@@ -2347,6 +2560,16 @@ func _move_entity_toward(target2: Vector2, spd: float, d: float, tlvl := -1) -> 
 		# v21a : en chasse elle ne tournait JAMAIS (elle courait de travers) -> rotation fluide rapide
 		var rot_spd := 3.6 if entity_mode != 2 else 7.5
 		entity.rotation.y = lerp_angle(entity.rotation.y, atan2(-dirv.x, -dirv.y), minf(1.0, rot_spd * d))
+	# v23 : anti-blocage UNIVERSEL — si elle n'avance pas (meuble, coin), elle passe fantome
+	var moved2 := (Vector2(entity.position.x, entity.position.z) - e2).length()
+	if spd > 0.1 and ent_ghost_t <= 0.0 and moved2 < spd * d * 0.3:
+		rig_stuck_t += d
+		if rig_stuck_t > 1.6:
+			ent_ghost_t = 4.0
+			rig_stuck_t = 0.0
+			rig_stuck_pos = e2
+	else:
+		rig_stuck_t = maxf(0.0, rig_stuck_t - d * 0.5)
 
 
 func _spawn_chaser() -> void:
@@ -3428,6 +3651,12 @@ func _win() -> void:
 	if tension_pl != null:
 		tension_pl.stop()
 	play("chime", -3.0)
+	# v23 : LA PORTE S'ILLUMINE — tu as reussi a sortir
+	if exit_glow_mat != null:
+		exit_glow_mat.albedo_color = Color(1.0, 0.9, 0.6)
+		exit_glow_mat.emission_energy = 3.4
+	if exit_light != null:
+		exit_light.light_energy = 5.0
 	locked = true
 	hud_on = false
 	var dirw := (Vector3(exit_pos.x, 0, exit_pos.y) - player.position).normalized()
@@ -3493,6 +3722,8 @@ func _unhandled_input(ev: InputEvent) -> void:
 				glue_zones.append([gpos, 8.0, gm])
 				play("step", -10.0, 0.5)
 				_toast(tt("glue_set"), 2.5)
+			if ev.keycode == KEY_R:
+				_try_door()
 			if ev.keycode == KEY_V:
 				vhs.visible = not vhs.visible
 				vhs_visible_pref = vhs.visible
@@ -3778,6 +4009,50 @@ func _process(d: float) -> void:
 			stair_cd = 1.0
 		skip_move = true
 		mv = Vector3.ZERO
+	stair2_cd = maxf(0.0, stair2_cd - d)
+	if stair2_t < 0.0 and stair2_cd <= 0.0:
+		# v23 : escalier etage -> grenier (montee vers -z, descente vers +z)
+		if pp2.x > 3.0 and pp2.x < 4.6 and pp2.y > 11.8 and pp2.y < 13.9 and player_level == 1 and player.position.y < 4.0 and mv.z < -0.05:
+			stair2_t = 0.0
+			stair2_dir = 1
+			_toast("ESCALIER → GRENIER (2,5 s)", 2.0)
+		elif pp2.x > 3.0 and pp2.x < 4.6 and pp2.y > 7.6 and pp2.y < 9.2 and player_level == 2 and player.position.y > 4.5 and mv.z > 0.05:
+			stair2_t = 1.0
+			stair2_dir = -1
+			_toast("ESCALIER → ÉTAGE (2,5 s)", 2.0)
+	if stair2_t >= 0.0:
+		var ascend2 := stair2_dir > 0
+		if ascend2:
+			stair2_t += d / 2.5
+		else:
+			stair2_t -= d / 2.5
+		var t2 := clampf(stair2_t, 0.0, 1.0)
+		player.position = Vector3(3.8, 2.98 + t2 * 2.4, lerpf(12.35, 8.35, t2))
+		player.velocity = Vector3.ZERO
+		if (ascend2 and stair2_t >= 1.0) or (not ascend2 and stair2_t <= 0.0):
+			stair2_t = -1.0
+			stair2_cd = 1.0
+			player_level = 2 if ascend2 else 1
+			if dbg != "":
+				print("DBG stair2 fini level=", player_level)
+		skip_move = true
+		mv = Vector3.ZERO
+	# v23 : ELLE enfonce les portes fermees sur son passage (bruit + ouverture brutale)
+	if entity != null and is_instance_valid(entity) and entity.visible and not _ent_asleep() and entity_mode >= 1:
+		_ensure_door_pl()
+		for dr3 in opendoors:
+			if not dr3["open"] and not dr3["slammed"]:
+				var d3: float = (dr3["pos"] - Vector2(entity.position.x, entity.position.z)).length()
+				if d3 < 1.1:
+					dr3["open"] = true
+					dr3["slammed"] = true
+					var tw3 := create_tween()
+					tw3.tween_property(dr3["pivot"], "rotation:y", float(dr3["th1"]), 0.22).set_trans(Tween.TRANS_QUAD)
+					if door_pl != null:
+						door_pl.position = Vector3(dr3["pos"].x, 1.1, dr3["pos"].y)
+						door_pl.pitch_scale = 0.7
+						door_pl.play()
+					play("scare", -10.0, 0.8)
 	if not skip_move:
 		var pb2 := Vector2(player.position.x, player.position.z)
 		player.move_and_slide()
@@ -3798,6 +4073,13 @@ func _process(d: float) -> void:
 			clock_pl.play()
 		elif state != "play" and clock_pl.playing:
 			clock_pl.playing = false
+	# v23 : nappes grenier / aile est en fondu selon l'endroit
+	if attic_pl != null and wing_pl != null and state == "play":
+		var want_at := -13.0 if player_level == 2 else -80.0
+		attic_pl.volume_db = lerpf(attic_pl.volume_db, want_at, minf(1.0, 2.0 * d))
+		var wx := clampf(1.0 - absf(player.position.x - 25.0) / 8.0, 0.0, 1.0)
+		var want_w := (-80.0 + wx * 62.0) if player_level == 0 else -80.0
+		wing_pl.volume_db = lerpf(wing_pl.volume_db, want_w, minf(1.0, 2.0 * d))
 	# v22d : la poupee tourne lentement la tete vers ELLE (< 10 m) — indicateur diegetique
 	if doll_head != null and is_instance_valid(doll_head) and doll_root != null and is_instance_valid(doll_root):
 		var want := 0.0
@@ -3850,7 +4132,7 @@ func _process(d: float) -> void:
 			play("creak", -2.0, rng.randf_range(0.85, 1.18))
 			noise = maxf(noise, 0.45 if sprinting else 0.30)
 	var p2z := Vector2(player.position.x, player.position.z)
-	player_level = 1 if player.position.y > 1.6 else 0
+	player_level = 2 if player.position.y > 4.2 else (1 if player.position.y > 1.6 else 0)
 	for zi in range(CREEK_ZONES.size()):
 		creek_cd[zi] = maxf(0.0, creek_cd[zi] - d)
 		if creek_cd[zi] <= 0.0 and player_level == 0 and (Vector2(CREEK_ZONES[zi].x, CREEK_ZONES[zi].y) - p2z).length() < CREEK_ZONES[zi].z:
@@ -4006,94 +4288,137 @@ func _process(d: float) -> void:
 			_toast(tt("heard"), 2.6)
 		if dbg != "":
 			print("DBG heard_event pos=%s lvl=%d dist=%.1f mode=%d" % [str(p2z), player_level, dist, entity_mode])
-	if bait_timer > 0.0:
-		bait_timer -= d
-		entity_mode = 1
-		_move_entity_toward(bait_pos, 2.6, d, bait_level)
-		if (bait_pos - epos2).length() < 0.8:
-			bait_timer = 0.0
-	elif entity_stun > 0.0:
-		entity_stun -= d
-	elif entity_mode == 2:
-		chase_t += d
-		var spd := 4.3 if candies.get("reglisse", false) else 3.6
-		if player_level != ent_level:
-			var pth := _bfs_path(_node_of(epos2, ent_level), _node_of(p2z, player_level))
-			if pth.size() > 1:
-				var mid: Vector2 = NODES[pth[1]]
-				_move_entity_toward(mid, spd, d, NODE_LVL[pth[1]])
-			else:
-				_move_entity_toward(p2z, spd, d, player_level)
-		else:
-			_move_entity_toward(p2z, spd, d, player_level)
-		if chase_t > 6.0 and noise < 0.35:
-			entity_mode = 0
-			chase_t = 0.0
-			entity_target = _node_of(epos2, ent_level)
-	elif heard_t > 0.0 and not hidden:
-		# v16 : elle sait OU tu as fait du bruit et elle y va (etage compris)
-		heard_t -= d
-		entity_mode = 1
-		_move_entity_toward(heard_pos, 2.5, d, heard_lvl)
-		if (heard_pos - epos2).length() < 0.9:
-			heard_t = 0.0
-			entity_target = _node_of(epos2, ent_level)
-			if dbg != "":
-				print("DBG heard_arrived t=%.1f" % run_time)
-	elif dist < hear_r:
-		if noise > 0.6 and dist < 6.0:
-			# v22d : jumpscare d'absence — la chasse commence par 4 s de silence TOTAL
-			if entity_mode != 2 and absence_t <= 0.0 and dbg == "":
-				absence_t = 4.0
-				AudioServer.set_bus_mute(0, true)
-			entity_mode = 2
-			chase_t = 0.0
-		elif entity_mode != 2:
-			entity_mode = 1
-		alert_t = 4.0
-		entity_target_pos = p2z
-		entity_target_lvl = player_level
-		_move_entity_toward(p2z, 3.6 if entity_mode == 2 else 2.2, d, player_level)
-		# v22d : anti-blocage = MODE FANTOME (plus de teleport loin de toi : elle te suit, meme a travers les murs)
-		rig_stuck_t += d
-		if rig_stuck_t >= 1.6:
-			if Vector2(entity.position.x, entity.position.z).distance_to(rig_stuck_pos) < 0.45:
-				ent_ghost_t = 4.0
-				if dbg != "":
-					print("DBG ghost ON (bloquee -> traverse tout, 4 s)")
-			rig_stuck_t = 0.0
-			rig_stuck_pos = Vector2(entity.position.x, entity.position.z)
-		if ent_ghost_t > 0.0 and fmod(run_time, 1.0) < d:
-			play("growl", -9.0, 1.2)   # elle grogne en traversant : tu sais qu'elle arrive
+	# ---- v23 : patterns FNAF (principes abstraits, pas un clone) ----
+	# 1) FIGEE sous ton regard direct (tant que tu la vois, elle n'avance plus)
+	# 2) DASH : si tu detournes les yeux > 5 s en pleine chasse, elle sprinte
+	# 3) FLANC : en traque elle contourne a gauche puis a droite, jamais tout droit
+	var seen3 := _ent_looked_at()
+	if seen3:
+		ent_notseen_t = 0.0
 	else:
-		if entity_mode == 1:
-			_move_entity_toward(entity_target_pos, 2.2, d)
-			alert_t -= d
-			if (entity_target_pos - epos2).length() < 0.8 or alert_t <= 0.0:
+		ent_notseen_t += d
+	ent_flank_cd -= d
+	if ent_flank_cd <= 0.0:
+		ent_flank_side = -ent_flank_side
+		ent_flank_cd = 9.0
+	if ent_dash_t > 0.0:
+		ent_dash_t -= d
+	var moving3: bool = player.velocity.length() > 0.6
+	if seen3 and not moving3 and dist > 3.0 and ent_dash_t <= 0.0:
+		ent_freeze_t += d
+	else:
+		ent_freeze_t = maxf(0.0, ent_freeze_t - d * 2.0)
+	var freeze_now := seen3 and not moving3 and dist > 3.0 and ent_freeze_t < 6.0 and ent_dash_t <= 0.0
+	if ent_freeze_t >= 6.0 and seen3 and ent_dash_t <= 0.0:
+		# anti-blocage : elle ne reste JAMAIS statufiee plus de 6 s -> elle fonce
+		ent_dash_t = 1.6
+		ent_freeze_t = 0.0
+		play("growl", -8.0, 1.3)
+	if ent_notseen_t > 5.0 and dist > 6.0 and dist < 22.0 and entity_mode == 2 and ent_dash_t <= 0.0:
+		ent_dash_t = 1.8
+		ent_notseen_t = 0.0
+		play("growl", -11.0, 1.15)
+	var sm3 := 2.1 if ent_dash_t > 0.0 else 1.0
+	if seen3 and moving3 and dist > 3.0 and ent_dash_t <= 0.0:
+		sm3 = 0.45   # tu la regardes en marchant : elle ralentit mais ne s'arrete pas
+	if ent_dash_t > 1.4 and fmod(run_time, 0.35) < d:
+		play("mstep", -6.0, 1.25)
+	var dirn := p2z - epos2
+	if dirn.length_squared() > 0.01:
+		dirn = dirn.normalized()
+	var flk := Vector2(-dirn.y, dirn.x) * 2.2 * ent_flank_side
+	if not freeze_now:
+		if bait_timer > 0.0:
+			bait_timer -= d
+			entity_mode = 1
+			_move_entity_toward(bait_pos, 2.6, d, bait_level)
+			if (bait_pos - epos2).length() < 0.8:
+				bait_timer = 0.0
+		elif entity_stun > 0.0:
+			entity_stun -= d
+		elif entity_mode == 2:
+			chase_t += d
+			var spd := 4.3 if candies.get("reglisse", false) else 3.6
+			if ent_dash_t > 0.0:
+				chase_t -= d * 0.5   # le sprint prolonge un peu la chasse
+			if player_level != ent_level:
+				var pth := _bfs_path(_node_of(epos2, ent_level), _node_of(p2z, player_level))
+				if pth.size() > 1:
+					var mid: Vector2 = NODES[pth[1]]
+					_move_entity_toward(mid, spd * sm3, d, NODE_LVL[pth[1]])
+				else:
+					_move_entity_toward(p2z, spd * sm3, d, player_level)
+			else:
+				_move_entity_toward(p2z, spd * sm3, d, player_level)
+			if chase_t > 6.0 and noise < 0.35:
+				entity_mode = 0
+				chase_t = 0.0
+				entity_target = _node_of(epos2, ent_level)
+		elif heard_t > 0.0 and not hidden:
+			# v16 : elle sait OU tu as fait du bruit et elle y va (etage compris)
+			heard_t -= d
+			entity_mode = 1
+			_move_entity_toward(heard_pos + flk * 0.35, 2.7 * sm3, d, heard_lvl)
+			if (heard_pos - epos2).length() < 0.9:
+				heard_t = 0.0
+				entity_target = _node_of(epos2, ent_level)
+				if dbg != "":
+					print("DBG heard_arrived t=%.1f" % run_time)
+		elif dist < hear_r:
+			if noise > 0.6 and dist < 6.0:
+				# v22d : jumpscare d'absence — la chasse commence par 4 s de silence TOTAL
+				if entity_mode != 2 and absence_t <= 0.0 and dbg == "":
+					absence_t = 4.0
+					AudioServer.set_bus_mute(0, true)
+				entity_mode = 2
+				chase_t = 0.0
+			elif entity_mode != 2:
+				entity_mode = 1
+			alert_t = 4.0
+			entity_target_pos = p2z
+			entity_target_lvl = player_level
+			var atk := p2z + (flk if entity_mode == 1 else Vector2.ZERO)
+			_move_entity_toward(atk, (3.6 if entity_mode == 2 else 2.45) * sm3, d, player_level)
+			# v22d : anti-blocage = MODE FANTOME (plus de teleport loin de toi : elle te suit, meme a travers les murs)
+			rig_stuck_t += d
+			if rig_stuck_t >= 1.6:
+				if Vector2(entity.position.x, entity.position.z).distance_to(rig_stuck_pos) < 0.45:
+					ent_ghost_t = 4.0
+					if dbg != "":
+						print("DBG ghost ON (bloquee -> traverse tout, 4 s)")
+				rig_stuck_t = 0.0
+				rig_stuck_pos = Vector2(entity.position.x, entity.position.z)
+			if ent_ghost_t > 0.0 and fmod(run_time, 1.0) < d:
+				play("growl", -9.0, 1.2)   # elle grogne en traversant : tu sais qu'elle arrive
+		else:
+			if entity_mode == 1:
+				_move_entity_toward(entity_target_pos + flk, 2.45 * sm3, d)
+				alert_t -= d
+				if (entity_target_pos - epos2).length() < 0.8 or alert_t <= 0.0:
+					entity_mode = 0
+					entity_target = _node_of(epos2, ent_level)
+			elif entity_mode == 2:
 				entity_mode = 0
 				entity_target = _node_of(epos2, ent_level)
-		elif entity_mode == 2:
-			entity_mode = 0
-			entity_target = _node_of(epos2, ent_level)
-		else:
-			var tgt: Vector2 = NODES[entity_target]
-			if (tgt - epos2).length() < 0.5:
-				var nb := _neighbors(entity_target)
-				var pool := []
-				for cand in nb:
-					if cand != 1:
-						pool.append(cand)
-				if pool.is_empty():
-					pool = nb.duplicate()
-				var pick: int = pool[rng.randi_range(0, pool.size() - 1)]
-				if (NODES[pick] - exit_pos).length() < 3.5 and (p2z - epos2).length() > 8.0 and pool.size() > 1:
-					for alt in pool:
-						if (NODES[alt] - exit_pos).length() >= 3.5:
-							pick = alt
-							break
-				entity_target = pick
-				tgt = NODES[entity_target]
-			_move_entity_toward(tgt, 0.0 if _ent_asleep() else 1.15, d, NODE_LVL[entity_target])
+			else:
+				var tgt: Vector2 = NODES[entity_target]
+				if (tgt - epos2).length() < 0.5:
+					var nb := _neighbors(entity_target)
+					var pool := []
+					for cand in nb:
+						if cand != 1:
+							pool.append(cand)
+					if pool.is_empty():
+						pool = nb.duplicate()
+					var pick: int = pool[rng.randi_range(0, pool.size() - 1)]
+					if (NODES[pick] - exit_pos).length() < 3.5 and (p2z - epos2).length() > 8.0 and pool.size() > 1:
+						for alt in pool:
+							if (NODES[alt] - exit_pos).length() >= 3.5:
+								pick = alt
+								break
+					entity_target = pick
+					tgt = NODES[entity_target]
+				_move_entity_toward(tgt, 0.0 if _ent_asleep() else 1.15, d, NODE_LVL[entity_target])
 	epos2 = Vector2(entity.position.x, entity.position.z)
 	dist = (epos2 - p2z).length()
 	entity.visible = true
@@ -5107,6 +5432,16 @@ func _anim_entity_rig(nd: Node3D, d: float, tt2: float, p2z: Vector2, mode: int,
 		return
 	var sk: Skeleton3D = st["skel"]
 	var md: Dictionary = RIG_MODES[clampi(mode, 0, 4)]
+	# ---- v23 : saccades nerveuses (plus d'articulations visibles) + lunge de sprint ----
+	if not st.has("tw_t"):
+		st["tw_t"] = 0.0
+		st["tw_a"] = 0.0
+	st["tw_t"] = float(st["tw_t"]) - d
+	if float(st["tw_t"]) <= 0.0:
+		st["tw_t"] = randf_range(2.2, 6.5)
+		st["tw_a"] = randf_range(0.12, 0.34) * (1.0 if randf() < 0.5 else -1.0)
+	var twv: float = float(st["tw_a"]) * clampf(float(st["tw_t"]) * 5.0, 0.0, 1.0) * clampf((1.4 - float(st["tw_t"])) * 2.5, 0.0, 1.0)
+	var dl := 0.30 if ent_dash_t > 0.0 else 0.0   # sprint : buste projete en avant, bras en arriere
 	if st["can"].is_empty():
 		st["can"] = {"lean": md["lean"], "head_p": md["head_p"], "arm_x": md["arm_x"], "arm_z": md["arm_z"],
 			"elbow": md["elbow"], "sh_up": md["sh_up"], "chest_p": md["chest_p"], "amp": md["amp"],
@@ -5182,13 +5517,14 @@ func _anim_entity_rig(nd: Node3D, d: float, tt2: float, p2z: Vector2, mode: int,
 		[Vector3(0, 1, 0), 0.09 * amp * sin(TAU * g) * 0.55]])
 	_rig_pose(sk, "spine", [[Vector3(1, 0, 0), float(can["lean"]) * 0.34], [Vector3(0, 0, 1), -sway * 0.30]])
 	var resp := 0.02 * sin(tt2 * 1.15) if mode == 0 else 0.03 * sin(tt2 * 3.1)
-	_rig_pose(sk, "chest", [[Vector3(1, 0, 0), float(can["lean"]) * 0.30 + float(can["chest_p"]) * 0.30 + resp],
-		[Vector3(0, 0, 1), -sway * 0.25]])
+	_rig_pose(sk, "chest", [[Vector3(1, 0, 0), float(can["lean"]) * 0.30 + float(can["chest_p"]) * 0.30 + resp + dl],
+		[Vector3(0, 0, 1), -sway * 0.25],
+		[Vector3(0, 1, 0), twv * 0.6]])
 	_rig_pose(sk, "neck", [[Vector3(1, 0, 0), float(can["head_p"]) * 0.35 + resp * 0.6],
 		[Vector3(0, 1, 0), float(can["head_y"]) * 0.35]])
 	_rig_pose(sk, "head", [[Vector3(1, 0, 0), float(can["head_p"]) * 0.65 + 0.05 * sin(tt2 * 3.7) + (0.09 if mode >= 2 else 0.0)],
-		[Vector3(0, 1, 0), float(can["head_y"]) * 0.65 + 0.09 * sin(tt2 * 0.63)],
-		[Vector3(0, 0, 1), 0.05 * sin(tt2 * 1.9)]])
+		[Vector3(0, 1, 0), float(can["head_y"]) * 0.65 + 0.09 * sin(tt2 * 0.63) + twv * 0.4],
+		[Vector3(0, 0, 1), 0.05 * sin(tt2 * 1.9) + twv]])
 	# --- machoire : ouverte en chasse, avec claquements ; negative = elle descend (mesure)
 	var ouv := float(can["jaw"])
 	if mode == 2:
@@ -5205,7 +5541,7 @@ func _anim_entity_rig(nd: Node3D, d: float, tt2: float, p2z: Vector2, mode: int,
 		var az: float = float(can["arm_z"]) * sgn2
 		_rig_pose(sk, "clav" + side, [[Vector3(0, 0, 1), -sgn2 * float(can["sh_up"]) * 0.30]])
 		_rig_pose(sk, "upperarm" + side, [[Vector3(1, 0, 0), ax], [Vector3(0, 0, 1), az],
-			[Vector3(0, 1, 0), -sgn2 * (0.10 + float(can["arm_fwd"]))]])
+			[Vector3(0, 1, 0), -sgn2 * (0.10 + float(can["arm_fwd"]) + dl * 0.7)]])
 		_rig_pose(sk, "forearm" + side, [[Vector3(1, 0, 0), float(can["elbow"]) - absf(sw) * 0.22]])
 		_rig_pose(sk, "hand" + side, [[Vector3(1, 0, 0), -0.18 + 0.10 * sin(tt2 * 5.1 + sgn2)],
 			[Vector3(0, 0, 1), az * 0.4]])

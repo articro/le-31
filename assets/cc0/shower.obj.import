@@ -1,0 +1,22 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://dwfwianoi24c"
+path="res://.godot/imported/shower.obj-a2822563510af953f746014c9d72914a.mesh"
+
+[deps]
+
+files=["res://.godot/imported/shower.obj-a2822563510af953f746014c9d72914a.mesh"]
+
+source_file="res://assets/cc0/shower.obj"
+dest_files=["res://.godot/imported/shower.obj-a2822563510af953f746014c9d72914a.mesh", "res://.godot/imported/shower.obj-a2822563510af953f746014c9d72914a.mesh"]
+
+[params]
+
+generate_tangents=true
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+optimize_mesh=true
+force_disable_mesh_compression=false

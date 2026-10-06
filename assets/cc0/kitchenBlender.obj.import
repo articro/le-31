@@ -1,0 +1,22 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://crm1yovi84cmp"
+path="res://.godot/imported/kitchenBlender.obj-a9e5164f0f19e4eebef050b3e41f9cc9.mesh"
+
+[deps]
+
+files=["res://.godot/imported/kitchenBlender.obj-a9e5164f0f19e4eebef050b3e41f9cc9.mesh"]
+
+source_file="res://assets/cc0/kitchenBlender.obj"
+dest_files=["res://.godot/imported/kitchenBlender.obj-a9e5164f0f19e4eebef050b3e41f9cc9.mesh", "res://.godot/imported/kitchenBlender.obj-a9e5164f0f19e4eebef050b3e41f9cc9.mesh"]
+
+[params]
+
+generate_tangents=true
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+optimize_mesh=true
+force_disable_mesh_compression=false
