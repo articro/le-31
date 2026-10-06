@@ -197,3 +197,32 @@ Le projet « Marmite & Monstres » est ABANDONNÉ par l'utilisateur : ne JAMAIS 
   d'un coup cle + TV + poupee + horloge via `/home/user/tools/trellis_gen.py` (deja ecrit).
 - Validation : AUDIT ALL OK (122 bodies) ; bot quiet seed 5 = WIN ; `--dbg=m2` = 99 897 tri repartis ;
   camera v14 intacte. Release **404060487** (tag v15 = 27604f69, 173 blobs, zip 74 101 123 o).
+
+### v17 DEMARCHE — 10 parties (genoux + coudes), creature dormante, banque sonore refaite (2026-10-05)
+- **Retour utilisateur** apres la v15 : « plus de mouvement », « elle apparait trop tot », « les sons sont nuls »,
+  « le grincement ne fait pas de bruit ». Les 4 points sont traites.
+- **Decoupe 10 parties** (`tools` : script inline) : body 63 741 / head 7 664 / armUR 1 879 / armLR 3 844 /
+  armUL 1 956 / armLL 4 013 / thighR 4 142 / shinR 4 330 / thighL 3 930 / shinL 4 398 tri.
+  Pivots : hanches (0 ; 0,94) · genoux (+-0,373 ; 0,47) · epaules (+-0,30 ; 1,88) · coudes (+-0,62 ; 1,528).
+  Offsets enfants : coude-epaule = (0,32 ; -0,352) · genou-hanche = (0,373 ; -0,47) — exprimes dans le repere
+  du parent NON tourne (le parent applique ensuite sa rotation, comme un vrai rig).
+- **`_build_entity_model3()` + `_anim_entity3()`** : cuisses sin(phase) x0,78 , genoux repliés
+  (-max(0,sin(phase+0,75))x1,15 en chasse), bras antagonistes + coudes (-0,95 en chasse), corps qui tangue
+  (rotation.z 0,075 / y bob), **tete qui suit le joueur** (lerp_angle borne +-0,9) et **pas synchronises**
+  (`mstep.wav` joue a chaque franchissement de PI de la phase). Articulations = spheres du meme materiau
+  (rayons 0,115 bassin / 0,085 epaules / 0,078 genoux / 0,062 coudes) pour masquer les coupes.
+- **Dormance** : `_ent_asleep()` = `run_time < 75 et notes_found == 0`. Pendant la dormance : invisible,
+  immobilise (vitesse de patrouille 0), hear_r = 0, position forcee sur `entity_node` (choisi LE PLUS LOIN
+  du joueur via sort_custom). **Reveil** : elle est repositionnee au point le plus eloigne de toi, + sting
+  + growl lointain, puis la « laisse d'ecoute » (v16) prend le relais. L'audit force `ent_spawn_delay = 0`.
+- **Banque sonore ENTIEREMENT refaite** (21 fichiers, synthese numpy main-codee) : step/mstep (pas),
+  creak (grincement de bois, 119 Ko, volume -8 -> -2 dB + **declenchement en marchant partout** via
+  `creek_sfx_t`), heart, breath, growl, sniff, whisper, chime, **key_jingle** (nouveau, ramassage de cle),
+  **paper** (nouveau, ramassage de note), scare, sting, drone, wind, house (craquements aleatoires),
+  tension, music (boucle 32 s), cam_click, tape_rewind, lowbatt.
+  `play()` charge par nom -> aucun cablage a refaire.
+- **F3** fait maintenant defiler 3 modeles (v17 -> v15 -> v13).
+- Validation : AUDIT ALL OK (122 bodies) ; `--dbg=m2` construit les 2 modeles (99 897 tri chacun) ;
+  bot quiet = WIN ; bot walk = se fait attraper (laisse d'ecoute active) ; le detail de debug `--dbg=m2`
+  teste desormais AUSSI le modele 10 parties.
+- Release **404417768** (tag v17 = 4a47a8f8, 199 blobs, zip 58 015 454 o).

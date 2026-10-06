@@ -40,3 +40,29 @@ récupérer depuis la release GitHub (`LE31_projet_godot_v12.zip`), jamais deman
 - Plafond de snapshot ~128 Mo : `hantise/.godot` (69 Mo) se supprime sans risque, le **zip projet se
   construit à la demande** puis se supprime après le push.
 - Upload par le chat : images/pdf/txt/md uniquement — **les `.glb` sont refusés** (passer par GitHub web).
+
+## ÉTAT AU 06/10/2026 (soir) — v19 « MONSTRE » prête, NON POUSSÉE
+
+* Dernière release en ligne : **v18** (tag `v18`) ; le dépôt GitHub est donc **une version en retard**.
+* **v19 locale** : `main.gd` **5 122 lignes**, marqueur `v19 MONSTRE`, zip `LE31_projet_godot_v19.zip`
+  (**70 207 406 octets**, 211 fichiers, 63 modèles, 47 sons).
+* Créature **skinnée** : `assets/models/monstre_rig.glb` (21 os, 99 897 tri, texture PNG embarquée) +
+  `monstre_sole.json`. Générateur : `tools/rig_monstre.py`. Animation de référence : `tools/anim_ref.py`.
+* Tests verts : `--dbg=rig` (pénétration −0,008 m / patinage 2,5 cm), `--dbg=audit` **ALL OK bodies=123**,
+  `--dbg=m2` 99 897 tri, `--dbg=mvis` 37/37, `--dbg=quiet` WIN catches=0.
+* Ordre de reproduction sur base neuve : `patch_v15a → v16a → v17a → v18a → v18b → v18d → v19a`.
+* Trucs à ne pas réapprendre : (1) l'os racine d'un glTF exporté doit porter le décalage du maillage ;
+  (2) Godot ne lit pas le WebP dans un glTF → PNG ; (3) `v @ R` = transposée, utiliser `R @ v` ;
+  (4) les rotations locales d'un os = (absolu voulu − absolu parent) − (repos absolu − repos parent) ;
+  (5) un canal de pose **intégré** (la phase de marche) ne doit jamais passer par le fondu.
+
+### Mise a jour (soir) — v20 « VISAGE », NON POUSSÉE
+
+* Marqueur en jeu : **`v20 VISAGE`**. `main.gd` 5 122 lignes. Paquet `LE31_projet_godot_v20.zip` **60 713 249 o**, 159 fichiers.
+* Peau/visage : `tools/skin_tex.py` (carte de cavité → orbites noires, bouche, mains refroidies, crasse).
+  **Après toute modification de la peau il faut relancer `tools/rig_monstre.py`** (c'est lui qui embarque la texture dans le .glb).
+* **Ne jamais supprimer `assets/models/monstre_rig_0.png`** : c'est la texture extraite par l'importateur Godot
+  (le .glb la référence). Si elle disparaît : effacer `monstre_rig.glb.import`, `rm -rf .godot/imported/*rig*` puis `--import`.
+* Reconstruction totale : `bash /home/user/REBUILD_v20.sh` (rig → peau → semelle → zip).
+* Le dossier `.godot/` est supprimé volontairement (78 Mo, régénérable) : le premier `--import` prend ~5 min.
+* Ordre des patchs sur base neuve : `v15a → v16a → v17a → v18a → v18b → v18d → v19a`.

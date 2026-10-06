@@ -139,3 +139,103 @@ Le projet « Marmite & Monstres » est ABANDONNÉ par l'utilisateur : ne JAMAIS 
   d'un coup cle + TV + poupee + horloge via `/home/user/tools/trellis_gen.py` (deja ecrit).
 - Validation : AUDIT ALL OK (122 bodies) ; bot quiet seed 5 = WIN ; `--dbg=m2` = 99 897 tri repartis ;
   camera v14 intacte. Release **404060487** (tag v15 = 27604f69, 173 blobs, zip 74 101 123 o).
+
+### v17 DEMARCHE — 10 parties (genoux + coudes), creature dormante, banque sonore refaite (2026-10-05)
+- **Retour utilisateur** apres la v15 : « plus de mouvement », « elle apparait trop tot », « les sons sont nuls »,
+  « le grincement ne fait pas de bruit ». Les 4 points sont traites.
+- **Decoupe 10 parties** (`tools` : script inline) : body 63 741 / head 7 664 / armUR 1 879 / armLR 3 844 /
+  armUL 1 956 / armLL 4 013 / thighR 4 142 / shinR 4 330 / thighL 3 930 / shinL 4 398 tri.
+  Pivots : hanches (0 ; 0,94) · genoux (+-0,373 ; 0,47) · epaules (+-0,30 ; 1,88) · coudes (+-0,62 ; 1,528).
+  Offsets enfants : coude-epaule = (0,32 ; -0,352) · genou-hanche = (0,373 ; -0,47) — exprimes dans le repere
+  du parent NON tourne (le parent applique ensuite sa rotation, comme un vrai rig).
+- **`_build_entity_model3()` + `_anim_entity3()`** : cuisses sin(phase) x0,78 , genoux repliés
+  (-max(0,sin(phase+0,75))x1,15 en chasse), bras antagonistes + coudes (-0,95 en chasse), corps qui tangue
+  (rotation.z 0,075 / y bob), **tete qui suit le joueur** (lerp_angle borne +-0,9) et **pas synchronises**
+  (`mstep.wav` joue a chaque franchissement de PI de la phase). Articulations = spheres du meme materiau
+  (rayons 0,115 bassin / 0,085 epaules / 0,078 genoux / 0,062 coudes) pour masquer les coupes.
+- **Dormance** : `_ent_asleep()` = `run_time < 75 et notes_found == 0`. Pendant la dormance : invisible,
+  immobilise (vitesse de patrouille 0), hear_r = 0, position forcee sur `entity_node` (choisi LE PLUS LOIN
+  du joueur via sort_custom). **Reveil** : elle est repositionnee au point le plus eloigne de toi, + sting
+  + growl lointain, puis la « laisse d'ecoute » (v16) prend le relais. L'audit force `ent_spawn_delay = 0`.
+- **Banque sonore ENTIEREMENT refaite** (21 fichiers, synthese numpy main-codee) : step/mstep (pas),
+  creak (grincement de bois, 119 Ko, volume -8 -> -2 dB + **declenchement en marchant partout** via
+  `creek_sfx_t`), heart, breath, growl, sniff, whisper, chime, **key_jingle** (nouveau, ramassage de cle),
+  **paper** (nouveau, ramassage de note), scare, sting, drone, wind, house (craquements aleatoires),
+  tension, music (boucle 32 s), cam_click, tape_rewind, lowbatt.
+  `play()` charge par nom -> aucun cablage a refaire.
+- **F3** fait maintenant defiler 3 modeles (v17 -> v15 -> v13).
+- Validation : AUDIT ALL OK (122 bodies) ; `--dbg=m2` construit les 2 modeles (99 897 tri chacun) ;
+  bot quiet = WIN ; bot walk = se fait attraper (laisse d'ecoute active) ; le detail de debug `--dbg=m2`
+  teste desormais AUSSI le modele 10 parties.
+- Release **404417768** (tag v17 = 4a47a8f8, 199 blobs, zip 58 015 454 o).
+
+---
+
+## S17 — v19 « MONSTRE » (06/10/2026) — création skinnée
+
+**Le changement de méthode.** Toutes les versions v13→v18 assemblaient la créature en 10 morceaux rigides collés
+(boules aux articulations pour cacher les coupes) : d'où les trous aux coudes et les épaules déformées.
+La v19 abandonne l'assemblage : `tools/rig_monstre.py` transforme le maillage TRELLIS brut
+(`monstre_tpose.glb`, 83 569 sommets, 99 897 triangles, A-pose, texture WebP réencodée en PNG) en
+**personnage skinné** `assets/models/monstre_rig.glb` :
+
+* squelette de **21 os** (hips, spine, chest, neck, head, clavL/R, upperarm, forearm, hand, thigh, shin, foot, toe) ;
+* poids de sommets = distance point‑segment avec **fenêtres anatomiques à bords lissés** (gate smoothstep),
+  puis **lissage laplacien** du maillage (8 voisins) ; 4 influences maximum par sommet ;
+* bascule 180° : le visage regarde **−Z** (convention Godot) ;
+* piège à retenir : **l'os racine doit porter le même décalage que le maillage** (ici −0,5 sur Y) sinon le
+  squelette pivote 0,5 m trop bas. C'est ce qui a coûté une régénération.
+* piège n°2 : **Godot 4.3 ne lit pas le WebP dans un glTF** (`Couldn't load image … image/webp`) → texture grise.
+  L'exporteur réencode donc la texture en PNG.
+
+**L'animation** (`tools/anim_ref.py`, portée à l'identique dans `main.gd::_anim_entity_rig`) :
+
+* jambes en **IK 2 os** dans le plan sagittal ; hauteur du bassin calée sur la foulée maximale
+  (`reach = 0,965 × chaîne`) pour que l'IK ne sature jamais ;
+* **phase d'appui pilotée par la distance** : `gait += (vitesse × dt) / (foulée / 0,62)` — l'appui dure 62 % du cycle ;
+* l'inclinaison et le roulis du bassin sont **retranchés** des jambes (sinon 12 cm de décalage du pied) ;
+* l'oscillation verticale du bassin est compensée pour ne pas rallonger la jambe (sinon le pied flotte de 7 cm) ;
+* filtre 1 pôle (16 s⁻¹) sur les seules rotations de jambes ; les canaux de pose (lean, arm_x, arm_z, arm_fwd,
+  elbow…) sont fondus à 3,6–5 s⁻¹ → transitions douces entre rôde / alerte / chasse / recul / bond ;
+* angles de bras **mesurés**, pas devinés : `rz +0,60` fait pendre le bras, `ry −1,10` le tend vers l'avant.
+  C'est `arm_fwd` (lacet des épaules) qui donne l'attitude de chasse.
+
+**Mesures en moteur** (`--dbg=rig`, 240 images) : pénétration du pied dans le sol **−0,008 m**,
+piétinement résiduel **2,5 cm/image** (bruit de mesure), 21 os, chaîne 0,3422.
+Batterie complète : `audit` OK (bodies=123), `m2` total_tris=99897, `mvis` 37/37, `quiet` WIN catches=0.
+
+**Autres correctifs v19** : rayon anti‑mur porté à **0,50 m** ; **déclic anti‑blocage** (si elle avance de moins de
+0,45 m en 1,6 s alors qu'elle traque, elle est replacée à 7‑30 m, même étage) ; **collider de la rampe de
+l'escalier du garage** — la rampe était purement décorative, le joueur butait sur les 24 marches de 12,4 cm et
+ne pouvait donc jamais monter à l'étage.
+
+**Reste à faire (v20)** : visage (yeux creux + mâchoire fendue animée — le maillage TRELLIS n'en a pas),
+puis les 4 props, l'extérieur nuit, les 8 trophées.
+
+---
+
+## S18 — v20 « VISAGE » (06/10/2026) — peau et visage peints en UV
+
+La géométrie TRELLIS contient bien des orbites et une bouche, mais la texture était beige et uniforme : le visage
+était donc illisible. `tools/skin_tex.py` peint la peau **en espace UV** (aucun risque pour le maillage) :
+
+1. **carte de cavité** : concavité par sommet (écart a la moyenne des 12 voisins, projeté sur la normale),
+   lissée en UV → les creux (orbites, bouche, narines, plis du cou, aisselles) s'assombrissent seuls ;
+2. **orbites renforcées** : les 25 % de sommets les plus creux de chaque côté de la face, en deux puits noirs ;
+3. **extrémités refroidies** (mains, pieds, visage), **crasse** (bruit basse fréquence + gravité),
+   **teinte cadavre**, arêtes saillantes éclaircies de 8 % ;
+4. piège : dans un atlas UV, **un sommet = un seul pixel** → tout masque doit être renormalisé après lissage,
+   sinon l'intensité est divisée par ~100 et rien ne se voit.
+
+**Correction trouvée** : en chasse, un bras partait vers l'avant et l'autre vers l'arrière. Le lacet d'épaule doit
+être appliqué avec **−sgn** (le côté gauche = x négatif dans le modèle Godot). Vérifié à l'image, face caméra.
+
+**Ménage du dépôt** : les 16 fichiers OBJ du monstre découpé (v13/v15/v17, ~32 Mo) sont supprimés — la créature
+est skinnée. Ne restent que `monstre_rig.glb` (le personnage), `monstre_tpose.glb` (la source pour régénérer),
+`monstre_rig_0.png` (**texture extraite par l'importateur Godot : obligatoire, ne pas supprimer**),
+`monstre_rig_bones.json` et `monstre_sole.json`.
+Commande de reconstruction complète : `bash /home/user/REBUILD_v20.sh`.
+
+**Mesures** : texture de base 0,306 de luminosité moyenne → 0,285 ; creux 0,074 ; orbites 0,105.
+Tests : `rig` −0,008 m de pénétration / 2,5 cm de patinage / 21 os · `audit` ALL OK bodies=123 ·
+`m2` RIG SKINNE 99897 tri · `mvis` 37/37 · `quiet` WIN catches=0. Paquet : **60 713 249 octets, 159 fichiers**.

@@ -2,19 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://5dqxgh6ukswn"
-path="res://.godot/imported/monstre_0.webp-6b472cc943a70c593d13c86dcfe0d79d.ctex"
+uid="uid://2kbmlvaa4ndb"
+path="res://.godot/imported/monstre_skin.png-603c38767cab1efb315218015a6a9d08.ctex"
 metadata={
 "vram_texture": false
-}
-generator_parameters={
-"md5": "e8372e733f86533b9b32a4461be11921"
 }
 
 [deps]
 
-source_file="res://assets/models/monstre_0.webp"
-dest_files=["res://.godot/imported/monstre_0.webp-6b472cc943a70c593d13c86dcfe0d79d.ctex"]
+source_file="res://assets/models/monstre_skin.png"
+dest_files=["res://.godot/imported/monstre_skin.png-603c38767cab1efb315218015a6a9d08.ctex"]
 
 [params]
 
@@ -24,7 +21,7 @@ compress/lossy_quality=0.7
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

@@ -378,12 +378,12 @@ var headlamp_on := true
 const CAM_SHADER := """
 shader_type canvas_item;
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear;
-uniform float fade := 1.0;
-uniform float vig := 0.92;
-uniform float grain := 0.09;
-uniform float scan := 0.10;
-uniform float glitch := 0.0;
-uniform vec3 tint := vec3(0.60, 1.00, 0.68);
+uniform float fade = 1.0;
+uniform float vig = 0.92;
+uniform float grain = 0.09;
+uniform float scan = 0.10;
+uniform float glitch = 0.0;
+uniform vec3 tint = vec3(0.60, 1.00, 0.68);
 float h21(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 void fragment() {
 	vec2 uv = SCREEN_UV;
@@ -407,6 +407,31 @@ void fragment() {
 """
 # ================= v15 : monstre a 6 parties (T-pose, bras animes) =================
 var ent_model_kind := 2        # 2 = v17 (10 parties) · 1 = v15 (6) · 0 = v13 (4)
+# ---- v19 : creature skinee (monstre_rig.glb, 21 os, peau continue) ----
+var rig_enabled := true
+var rig_state := {}            # instance_id -> {skel, mesh, gait, can, fil}
+var rig_scale := 2.80
+var rig_y_hip := 0.4154
+var rig_y_ank := 0.0904
+var rig_l_thigh := 0.1838
+var rig_l_shin := 0.1636
+var rig_chain := 0.342
+var rig_b_thigh := -0.15
+var rig_b_shin := -0.019
+var rig_b_foot := 0.785
+var rig_sole := []             # enveloppe de la semelle (y,z) dans le repere de l'os du pied
+var rig_sole_k0 := 0.0
+var rig_stuck_t := 0.0
+var rig_stuck_pos := Vector2.ZERO
+const RIG_MODES := {
+	0: {"lean": 0.05, "head_p": 0.10, "arm_x": -0.15, "arm_z": 0.60, "arm_fwd": -0.30, "elbow": -0.30, "sh_up": 0.05, "chest_p": 0.08, "amp": 0.45, "stride": 0.30, "jaw": 0.06},
+	1: {"lean": 0.20, "head_p": -0.05, "arm_x": -0.10, "arm_z": 0.55, "arm_fwd": -0.48, "elbow": -0.60, "sh_up": 0.10, "chest_p": 0.14, "amp": 1.00, "stride": 0.42, "jaw": 0.12},
+	2: {"lean": 0.42, "head_p": -0.14, "arm_x": 0.30, "arm_z": 0.10, "arm_fwd": -1.10, "elbow": -1.00, "sh_up": 0.28, "chest_p": 0.22, "amp": 1.20, "stride": 0.56, "jaw": 0.34},
+	3: {"lean": -0.28, "head_p": 0.26, "arm_x": 0.10, "arm_z": 0.50, "arm_fwd": -0.50, "elbow": -1.30, "sh_up": 0.45, "chest_p": -0.14, "amp": 0.35, "stride": 0.25, "jaw": 0.60},
+	4: {"lean": 0.60, "head_p": 0.12, "arm_x": 0.35, "arm_z": 0.05, "arm_fwd": -1.30, "elbow": -0.50, "sh_up": 0.40, "chest_p": 0.30, "amp": 0.80, "stride": 0.34, "jaw": 0.46},
+}
+var rig_dbg := false
+const ENT_SCALE := 1.191       # v18 : 2,35 m -> 2,80 m (elle doit dominer la piece)
 var ent_prev_phase := 0.0
 var ent_anim_dbg := 0
 var ent_step: AudioStreamPlayer3D = null
@@ -454,6 +479,15 @@ var pocket_lbl: Label = null
 var noise_bg: ColorRect = null
 var noise_fill: ColorRect = null
 var noise_lbl: Label = null
+var noise_dot: ColorRect = null
+var stam_lbl: Label = null
+var inv_ctl: Control = null
+var inv_lbl: Label = null
+var inv_open := false
+var menu_ent: Node3D = null
+var menu_t := 0.0
+var mvis_run := false
+var decor_rich_done := false
 var poster_base := "poster_a"
 var wind_pl: AudioStreamPlayer = null
 var house_pl: AudioStreamPlayer = null
@@ -570,6 +604,18 @@ func _collider_box(sz: Vector3, at: Vector3) -> void:
 	b.position = at
 	world.add_child(b)
 
+
+
+func _collider_ramp(sz: Vector3, at: Vector3, angx: float) -> void:
+	var b := StaticBody3D.new()
+	var c := CollisionShape3D.new()
+	var bm: BoxShape3D = BoxShape3D.new()
+	bm.size = sz
+	c.shape = bm
+	b.add_child(c)
+	b.position = at
+	b.rotation = Vector3(angx, 0, 0)
+	world.add_child(b)
 
 
 func _build_world() -> void:
@@ -764,6 +810,9 @@ func _room_floor(x1: float, z1: float, x2: float, z2: float, mat: StandardMateri
 
 
 func _furn(sz: Vector3, at: Vector3, m: StandardMaterial3D, rot_y := 0.0, rot_x := 0.0) -> MeshInstance3D:
+	# v18 : AUCUN meuble ne doit boucher l'escalier du garage (reproche utilisateur) -> deplace vers le fond
+	if at.x > 0.30 and at.x < 2.70 and at.y < 2.20 and at.z > 6.60 and at.z < 13.20:
+		at = Vector3(6.6, at.y, at.z)
 	var b := _box(sz, m)
 	b.position = at
 	b.rotation = Vector3(rot_x, rot_y, 0)
@@ -918,6 +967,9 @@ func _build_house() -> void:
 	ramp.position = Vector3(1.5, 1.49, 9.92)
 	ramp.rotation = Vector3(ramp_ang, 0, 0)
 	world.add_child(ramp)
+	# v19 : SANS ce collider la rampe n'etait que decorative — le joueur butait sur chaque
+	# marche (12 cm) et ne pouvait donc JAMAIS monter a l'etage. Une pente de 30 deg se grimpe.
+	_collider_ramp(Vector3(1.2, 0.16, ramp_len), Vector3(1.5, 1.49, 9.92), ramp_ang)
 	for st in range(24):
 		var scz := 12.4 - st * 0.2146
 		var scy := (st + 1) * 0.124 - 0.062
@@ -1235,7 +1287,165 @@ func _make_pumpkin(at: Vector3, scale := 1.0) -> Node3D:
 	return nd
 
 
+func _rig_find_skel(n: Node) -> Skeleton3D:
+	if n is Skeleton3D:
+		return n
+	for c in n.get_children():
+		var r := _rig_find_skel(c)
+		if r != null:
+			return r
+	return null
+
+
+func _rig_find_mesh(n: Node) -> MeshInstance3D:
+	if n is MeshInstance3D:
+		return n
+	for c in n.get_children():
+		var r := _rig_find_mesh(c)
+		if r != null:
+			return r
+	return null
+
+
+func _rig_sag(a: Vector3, b: Vector3) -> float:
+	# angle sagittal (positif = vers l'avant, c'est-a-dire -Z) de a vers b
+	return atan2(-(b.z - a.z), a.y - b.y)
+
+
+func _rig_prepare(sk: Skeleton3D) -> void:
+	# reperes mesures sur le squelette lui-meme (aucune valeur devinee)
+	var iT := sk.find_bone("thighL")
+	var iS := sk.find_bone("shinL")
+	var iF := sk.find_bone("footL")
+	var iTo := sk.find_bone("toeL")
+	if iT < 0 or iS < 0 or iF < 0 or iTo < 0:
+		return
+	var pT := sk.get_bone_global_rest(iT).origin
+	var pS := sk.get_bone_global_rest(iS).origin
+	var pF := sk.get_bone_global_rest(iF).origin
+	var pTo := sk.get_bone_global_rest(iTo).origin
+	rig_y_hip = pT.y
+	rig_y_ank = pF.y
+	rig_l_thigh = (pS - pT).length()
+	rig_l_shin = (pF - pS).length()
+	rig_chain = 0.985 * (rig_l_thigh + rig_l_shin)
+	rig_b_thigh = _rig_sag(pT, pS)
+	rig_b_shin = _rig_sag(pS, pF)
+	rig_b_foot = _rig_sag(pF, pTo)
+	# semelle : enveloppe convexe (y, z) des points de contact, lue depuis le fichier genere
+	if rig_sole.is_empty():
+		var f := FileAccess.open("res://assets/models/monstre_sole.json", FileAccess.READ)
+		if f != null:
+			var j = JSON.parse_string(f.get_as_text())
+			if j is Dictionary and j.has("footL"):
+				for p in j["footL"]["hull"]:
+					rig_sole.append(Vector3(float(p[0]), float(p[1]), float(p[2])))
+		if rig_sole.is_empty():
+			rig_sole = [Vector3(0.02, -0.088, -0.12), Vector3(0.02, -0.088, 0.024), Vector3(-0.02, -0.02, 0.024)]
+		rig_sole_k0 = _rig_sole_low(0.0)
+	if dbg != "":
+		print("DBG rig : hanche=%.4f cheville=%.4f cuisse=%.4f tibia=%.4f chaine=%.4f repos(%.3f %.3f %.3f) semelle=%d pts k0=%.4f"
+			% [rig_y_hip, rig_y_ank, rig_l_thigh, rig_l_shin, rig_chain, rig_b_thigh, rig_b_shin, rig_b_foot, rig_sole.size(), rig_sole_k0])
+
+
+func _rig_sole_low(theta: float) -> float:
+	# ordonnee du point de semelle le plus bas apres une rotation de tangage theta (autour de X)
+	var lo := 999.0
+	for p in rig_sole:
+		lo = minf(lo, p.y * cos(theta) - p.z * sin(theta))
+	return lo
+
+
+func _ent_audio_attach(nd: Node3D) -> void:
+	# souffle, grognement, reniflement, pas : la creature s'ENTEND avant de se voir
+	ent_breath = AudioStreamPlayer3D.new()
+	ent_breath.stream = load("res://assets/audio/breath.wav")
+	ent_breath.volume_db = -22.0
+	ent_breath.unit_size = 6.0
+	ent_breath.max_distance = 16.0
+	ent_breath.position = Vector3(0, 1.9, 0)
+	nd.add_child(ent_breath)
+	ent_growl = AudioStreamPlayer3D.new()
+	ent_growl.stream = load("res://assets/audio/growl.wav")
+	ent_growl.volume_db = -8.0
+	ent_growl.unit_size = 9.0
+	ent_growl.max_distance = 26.0
+	ent_growl.position = Vector3(0, 1.7, 0)
+	nd.add_child(ent_growl)
+	ent_sniff = AudioStreamPlayer3D.new()
+	ent_sniff.stream = load("res://assets/audio/sniff.wav")
+	ent_sniff.volume_db = -10.0
+	ent_sniff.unit_size = 5.0
+	ent_sniff.max_distance = 14.0
+	ent_sniff.position = Vector3(0, 1.9, -0.2)
+	nd.add_child(ent_sniff)
+	ent_step = AudioStreamPlayer3D.new()
+	ent_step.stream = load("res://assets/audio/mstep.wav")
+	ent_step.volume_db = -8.0
+	ent_step.unit_size = 7.0
+	ent_step.max_distance = 22.0
+	ent_step.position = Vector3(0, 0.15, 0)
+	nd.add_child(ent_step)
+
+
+func _build_entity_rig() -> Node3D:
+	# v19 : la creature skinee — un seul maillage, un squelette de 21 os
+	var ps: PackedScene = load("res://assets/models/monstre_rig.glb")
+	if ps == null:
+		return null
+	var inst: Node3D = ps.instantiate()
+	if inst == null:
+		return null
+	var sk := _rig_find_skel(inst)
+	if sk == null:
+		inst.queue_free()
+		return null
+	inst.name = "EntityRig"
+	rig_state[inst.get_instance_id()] = {"skel": sk, "mesh": _rig_find_mesh(inst), "gait": 0.0, "can": {}, "fil": {}, "step": 0.0}
+	_rig_prepare(sk)
+	# peau : sous-surface + lisere lumineux -> elle se detache de l'obscurite (horreur lisible)
+	var mi := _rig_find_mesh(inst)
+	if mi != null:
+		var src := mi.get_active_material(0)
+		if src is StandardMaterial3D:
+			var m: StandardMaterial3D = (src as StandardMaterial3D).duplicate()
+			m.roughness = 0.62
+			m.metallic = 0.0
+			m.subsurf_scatter_enabled = true
+			m.subsurf_scatter_strength = 0.16
+			m.rim_enabled = true
+			m.rim = 0.42
+			m.rim_tint = 0.5
+			mi.material_override = m
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	inst.scale = Vector3(rig_scale, rig_scale, rig_scale)
+	var aura := OmniLight3D.new()
+	aura.light_color = Color(0.72, 0.68, 0.62)
+	aura.light_energy = 0.34
+	aura.omni_range = 2.1
+	aura.position = Vector3(0, 1.5, 0)
+	inst.add_child(aura)
+	_ent_audio_attach(inst)
+	if dbg != "":
+		print("DBG entity=RIG SKINNE os=%d tri=%d" % [sk.get_bone_count(), _rig_tri_count(mi)])
+	return inst
+
+
+func _rig_tri_count(mi: MeshInstance3D) -> int:
+	if mi == null or mi.mesh == null or mi.mesh.get_surface_count() == 0:
+		return 0
+	var arr: Array = mi.mesh.surface_get_arrays(0)
+	if arr.size() <= Mesh.ARRAY_INDEX or arr[Mesh.ARRAY_INDEX] == null:
+		return 0
+	return (arr[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
+
+
 func _make_entity() -> Node3D:
+	# v19 : la creature skinee d'abord (vraie peau continue, vraie demarche)
+	if rig_enabled and dbg != "nomodel" and dbg != "model1" and dbg != "old" and ResourceLoader.exists("res://assets/models/monstre_rig.glb"):
+		var mr := _build_entity_rig()
+		if mr != null:
+			return mr
 	# v15 : monstre T-pose a 6 parties (bras animes) par defaut ; v13 en repli ; --dbg=model1 force la v13.
 	if dbg != "nomodel" and dbg != "model1" and ent_model_kind == 2 and ResourceLoader.exists("res://assets/models/monstre3_body.obj"):
 		var md3 := _build_entity_model3()
@@ -1582,6 +1792,7 @@ func _make_entity() -> Node3D:
 	ent_sniff.max_distance = 14.0
 	ent_sniff.position = Vector3(0, 1.9, -0.2)
 	nd.add_child(ent_sniff)
+	nd.scale = Vector3(ENT_SCALE, ENT_SCALE, ENT_SCALE)
 	return nd
 
 func _build_entity_model() -> Node3D:
@@ -1659,6 +1870,7 @@ func _build_entity_model() -> Node3D:
 	ent_sniff.max_distance = 14.0
 	ent_sniff.position = Vector3(0, 1.9, -0.2)
 	nd.add_child(ent_sniff)
+	nd.scale = Vector3(ENT_SCALE, ENT_SCALE, ENT_SCALE)
 	return nd
 
 
@@ -1737,6 +1949,157 @@ func _draw_loop() -> void:
 	dyn.add_child(key_mesh_c)
 
 
+func _decor_rich() -> void:
+	# v18 : ~80 objets decoratifs pour remplir la maison (AUCUNE collision : rien ne peut bloquer)
+	var wood := _simple(Color(0.30, 0.19, 0.11), 0.75)
+	var wood2 := _simple(Color(0.22, 0.14, 0.08), 0.8)
+	var paper := _simple(Color(0.72, 0.68, 0.58), 0.9)
+	var glass := _simple(Color(0.35, 0.45, 0.40), 0.15, 0.4)
+	var metal := _simple(Color(0.55, 0.55, 0.58), 0.35, 0.8)
+	var cloth := _simple(Color(0.42, 0.16, 0.14), 0.95)
+	var cloth2 := _simple(Color(0.20, 0.24, 0.30), 0.95)
+	var toy1 := _simple(Color(0.75, 0.55, 0.20), 0.7)
+	var toy2 := _simple(Color(0.30, 0.45, 0.55), 0.7)
+	# --- CADRES PHOTO sur les murs (film : les murs ne sont plus nus) ---
+	var frames := [
+		[Vector3(0.62, 1.55, 4.0), 0.0, Vector3(0.05, 0.42, 0.34), wood2],
+		[Vector3(0.62, 1.62, 6.2), 0.0, Vector3(0.05, 0.34, 0.28), wood],
+		[Vector3(0.62, 1.48, 11.0), 0.0, Vector3(0.05, 0.30, 0.38), wood2],
+		[Vector3(18.62, 1.58, 3.0), 0.0, Vector3(0.05, 0.36, 0.30), wood],
+		[Vector3(18.62, 1.50, 6.5), 0.0, Vector3(0.05, 0.44, 0.36), wood2],
+		[Vector3(18.62, 1.60, 10.6), 0.0, Vector3(0.05, 0.30, 0.26), wood],
+		[Vector3(6.0, 1.55, 0.62), 0.0, Vector3(0.36, 0.40, 0.05), wood2],
+		[Vector3(12.6, 1.62, 0.62), 0.0, Vector3(0.44, 0.32, 0.05), wood],
+		[Vector3(16.4, 1.52, 0.62), 0.0, Vector3(0.30, 0.38, 0.05), wood2],
+		[Vector3(4.4, 1.58, 13.62), 0.0, Vector3(0.38, 0.34, 0.05), wood],
+		[Vector3(9.6, 1.50, 13.62), 0.0, Vector3(0.30, 0.42, 0.05), wood2],
+		[Vector3(14.8, 1.60, 13.62), 0.0, Vector3(0.42, 0.30, 0.05), wood],
+	]
+	for cp in frames:
+		var fr := _box(cp[2], wood2)
+		fr.position = cp[0]
+		world.add_child(fr)
+		var ph := _box(cp[2] * Vector3(0.05, 0.72, 0.72) + Vector3(0.02, 0.0, 0.0), paper)
+		ph.position = cp[0] + Vector3(0.03 if cp[0].x < 9.0 else -0.03, 0, 0)
+		world.add_child(ph)
+	# --- TAPIS (au sol, plats) ---
+	for tp in [[Vector3(9.5, 0.012, 3.0), Vector2(2.4, 1.8), cloth], [Vector3(11.0, 0.012, 8.2), Vector2(1.6, 6.0), cloth2],
+			   [Vector3(6.0, 0.012, 5.0), Vector2(2.0, 2.6), cloth2], [Vector3(15.8, 2.992, 4.0), Vector2(2.2, 1.6), cloth],
+			   [Vector3(3.4, 0.012, 11.0), Vector2(2.0, 1.4), cloth2]]:
+		var rug := _quad(tp[1], tp[2])
+		rug.position = tp[0]
+		world.add_child(rug)
+	# --- CARTONS empiles (garage, grenier, cave) ---
+	for i in range(10):
+		var bx := _box(Vector3(0.52, 0.42, 0.42), _simple(Color(0.46, 0.34, 0.20), 0.95))
+		bx.position = Vector3(6.3 + float(i % 3) * 0.62, 0.22 + float(i / 6) * 0.44, 3.0 + float(i % 4) * 0.55)
+		bx.rotation.y = float(i) * 0.31
+		world.add_child(bx)
+	for i2 in range(6):
+		var bx2 := _box(Vector3(0.46, 0.38, 0.38), _simple(Color(0.40, 0.29, 0.17), 0.95))
+		bx2.position = Vector3(2.2 + float(i2 % 2) * 0.55, 0.20 + float(i2 / 4) * 0.40, 12.4 - float(i2 % 3) * 0.5)
+		bx2.rotation.y = float(i2) * 0.5
+		world.add_child(bx2)
+	# --- BOUTEILLES et BOCAUX (cuisine, au sol contre le mur) ---
+	for i3 in range(9):
+		var bt := _box(Vector3(0.075, 0.26, 0.075), glass)
+		bt.position = Vector3(0.85 + float(i3 % 5) * 0.22, 0.13, 9.55)
+		world.add_child(bt)
+		var cap := _box(Vector3(0.05, 0.10, 0.05), _simple(Color(0.25, 0.35, 0.22), 0.2))
+		cap.position = Vector3(0.85 + float(i3 % 5) * 0.22, 0.31, 9.55)
+		world.add_child(cap)
+	# --- JOUETS D'ENFANT (chambre d'Elise) ---
+	for i4 in range(7):
+		var tb := _box(Vector3(0.12, 0.12, 0.12), toy1 if i4 % 2 == 0 else toy2)
+		tb.position = Vector3(14.2 + float(i4 % 4) * 0.28, 0.06, 4.4 + float(i4 / 4) * 0.34)
+		tb.rotation.y = float(i4) * 0.7
+		world.add_child(tb)
+	# --- CHAUSSURES / VETEMENTS au sol ---
+	for i5 in range(6):
+		var sh2 := _box(Vector3(0.11, 0.075, 0.26), _simple(Color(0.12, 0.10, 0.09), 0.95))
+		sh2.position = Vector3(1.0 + float(i5 % 3) * 0.30, 0.04, 7.9)
+		sh2.rotation.y = float(i5) * 0.8
+		world.add_child(sh2)
+	# --- ELEMENTS DIVERS (seaux, outils, vaisselle, livres) ---
+	var buckets := [Vector3(7.2, 0.14, 12.8), Vector3(3.5, 0.14, 12.2), Vector3(17.3, 0.14, 12.9)]
+	for b2 in buckets:
+		for j in range(2):
+			var bk := MeshInstance3D.new()
+			var cyl := CylinderMesh.new()
+			cyl.top_radius = 0.14
+			cyl.bottom_radius = 0.11
+			cyl.height = 0.28
+			bk.mesh = cyl
+			bk.material_override = metal
+			bk.position = b2 + Vector3(float(j) * 0.34, 0, 0)
+			world.add_child(bk)
+	for i6 in range(14):
+		var bk2 := _box(Vector3(0.16, 0.045, 0.22), _simple(Color(0.45, 0.30, 0.16), 0.95))
+		bk2.position = Vector3(8.6 + float(i6 % 5) * 0.19, 0.78 + float(i6 / 5) * 0.06, 2.0)
+		bk2.rotation.z = 0.06 * float(i6 % 3)
+		world.add_child(bk2)
+	for i7 in range(5):
+		var dish := MeshInstance3D.new()
+		var dm := CylinderMesh.new()
+		dm.top_radius = 0.13
+		dm.bottom_radius = 0.13
+		dm.height = 0.02
+		dish.mesh = dm
+		dish.material_override = paper
+		dish.position = Vector3(9.2 + float(i7) * 0.30, 0.86, 1.75)
+		world.add_child(dish)
+	# --- TOILES D'ARAIGNEES dans les coins hauts ---
+	var web := _simple(Color(0.78, 0.78, 0.74), 0.9)
+	web.transparency_mode = 1
+	web.albedo_color = Color(0.78, 0.78, 0.74, 0.20)
+	for cn in [Vector3(0.7, 2.60, 0.7), Vector3(18.5, 2.60, 0.7), Vector3(0.7, 2.60, 13.3), Vector3(18.5, 2.60, 13.3),
+			   Vector3(0.7, 5.60, 0.7), Vector3(18.5, 5.60, 13.3), Vector3(11.4, 2.60, 0.7)]:
+		var wq := _quad(Vector2(1.1, 1.1), web)
+		wq.position = cn
+		wq.rotation = Vector3(0, 0.7, 0.7)
+		world.add_child(wq)
+	# --- LAMPES : ampoules suspendues un peu partout (lumiere tamisee, atmosphere) ---
+	var bulb_m := _simple(Color(0.95, 0.85, 0.60), 0.3)
+	bulb_m.emission_enabled = true
+	bulb_m.emission = Color(1.0, 0.80, 0.45)
+	bulb_m.emission_energy_multiplier = 1.6
+	for lp in [Vector3(4.0, 2.45, 4.0), Vector3(9.5, 2.45, 8.0), Vector3(14.5, 2.45, 4.0), Vector3(16.0, 2.45, 10.0),
+			   Vector3(4.0, 5.45, 4.0), Vector3(9.0, 5.45, 8.0), Vector3(6.0, 2.45, 11.5)]:
+		var wire := _box(Vector3(0.015, 0.55, 0.015), _simple(Color(0.05, 0.05, 0.05), 0.9))
+		wire.position = lp + Vector3(0, 0.28, 0)
+		world.add_child(wire)
+		var bl := MeshInstance3D.new()
+		var bm2 := SphereMesh.new()
+		bm2.radius = 0.055
+		bm2.height = 0.11
+		bl.mesh = bm2
+		bl.material_override = bulb_m
+		bl.position = lp
+		world.add_child(bl)
+		var li2 := OmniLight3D.new()
+		li2.light_color = Color(1.0, 0.82, 0.55)
+		li2.light_energy = 0.55
+		li2.omni_range = 3.4
+		li2.position = lp
+		world.add_child(li2)
+
+
+func _refresh_inventory() -> void:
+	# v18 : contenu du panneau d'inventaire (touche I)
+	var lines := []
+	lines.append("CE QUE TU AS")
+	lines.append("")
+	lines.append(("  [x] CLE DOREE (porte de sortie)" if has_key_exit else "  [ ] cle doree — pas encore trouvee"))
+	lines.append(("  [x] CLE DE CAVE" if has_key_ch1 else "  [ ] cle de cave — pas encore trouvee"))
+	lines.append("  [%s] bonbons de diversion : %d" % ["x" if pocket > 0 else " ", pocket])
+	lines.append("  [%s] piles de rechange : %d" % ["x" if battery_charges > 0 else " ", battery_charges])
+	lines.append("  [x] camerascope — batterie %d %%" % int(battery))
+	lines.append("  [%s] notes de la maison : %d / 5" % ["x" if notes_found > 0 else " ", notes_found])
+	lines.append("")
+	lines.append("I : fermer")
+	inv_lbl.text = "\n".join(lines)
+
+
 func _apply_anomaly() -> void:
 	pass
 
@@ -1802,8 +2165,15 @@ func _move_entity_toward(target2: Vector2, spd: float, d: float, tlvl := -1) -> 
 	var dirv := (target2 - e2) if en == tn else (goal - e2)
 	if dirv.length() > 0.01:
 		dirv = dirv.normalized()
-		entity.position = Vector3(e2.x + dirv.x * spd * d, 0, e2.y + dirv.y * spd * d)
-		# v13 : orientation luee (le modele 3D regarde vers -Z, comme la version procedurale)
+		var step2 := Vector3(dirv.x * spd * d, 0, dirv.y * spd * d)
+		var np := e2 + Vector2(step2.x, step2.z)
+		# v18 : elle ne traverse plus les murs (test de collision + glissement le long de l'obstacle)
+		if _ent_can_stand(np):
+			entity.position = Vector3(np.x, 0, np.y)
+		elif _ent_can_stand(Vector2(np.x, e2.y)):
+			entity.position = Vector3(np.x, 0, e2.y)
+		elif _ent_can_stand(Vector2(e2.x, np.y)):
+			entity.position = Vector3(e2.x, 0, np.y)
 		if entity_mode != 2:
 			entity.rotation.y = lerp_angle(entity.rotation.y, atan2(-dirv.x, -dirv.y), minf(1.0, 3.6 * d))
 
@@ -2097,7 +2467,52 @@ func _build_ui() -> void:
 	noise_lbl.text = tt("noise_lbl")
 	noise_lbl.add_theme_color_override("font_color", Color(0.85, 0.3, 0.22))
 	ui.add_child(noise_lbl)
-	hud_nodes = [hud_lbl, hint_lbl, ts_lbl, banner_lbl, toast_lbl, cap_lbl, obj_lbl, osd_lbl, stam_bg, stam_fill, pocket_lbl, noise_bg, noise_fill, noise_lbl, cam_lbl, batt_bg, batt_fill]
+		# ---- v18 : les DEUX BARRES du bas sont supprimees (reproche utilisateur) ----
+	noise_bg.visible = false
+	noise_fill.visible = false
+	noise_lbl.visible = false
+	stam_bg.visible = false
+	stam_fill.visible = false
+	# a la place : un seul voyant discret de bruit, et l'endurance seulement quand ca compte
+	noise_dot = ColorRect.new()
+	noise_dot.position = Vector2(16, 700)
+	noise_dot.size = Vector2(9, 9)
+	noise_dot.color = Color(0.85, 0.25, 0.18, 0.0)
+	ui.add_child(noise_dot)
+	stam_lbl = Label.new()
+	stam_lbl.position = Vector2(32, 694)
+	stam_lbl.size = Vector2(200, 22)
+	stam_lbl.add_theme_font_size_override("font_size", 13)
+	stam_lbl.add_theme_color_override("font_color", Color(0.9, 0.65, 0.35))
+	stam_lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
+	stam_lbl.add_theme_constant_override("outline_size", 4)
+	stam_lbl.visible = false
+	ui.add_child(stam_lbl)
+	hud_nodes = [hud_lbl, hint_lbl, ts_lbl, banner_lbl, toast_lbl, cap_lbl, obj_lbl, osd_lbl, pocket_lbl, cam_lbl, batt_bg, batt_fill, noise_dot, stam_lbl]
+	# ---- v18 : panneau d'INVENTAIRE (touche I) ----
+	inv_ctl = Control.new()
+	inv_ctl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	inv_ctl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	inv_ctl.visible = false
+	ui.add_child(inv_ctl)
+	var inv_bg := ColorRect.new()
+	inv_bg.position = Vector2(30, 120)
+	inv_bg.size = Vector2(330, 250)
+	inv_bg.color = Color(0.02, 0.02, 0.025, 0.82)
+	inv_ctl.add_child(inv_bg)
+	var inv_border := ColorRect.new()
+	inv_border.position = Vector2(30, 120)
+	inv_border.size = Vector2(330, 2)
+	inv_border.color = Color(0.85, 0.45, 0.12, 0.9)
+	inv_ctl.add_child(inv_border)
+	inv_lbl = Label.new()
+	inv_lbl.position = Vector2(46, 132)
+	inv_lbl.size = Vector2(300, 230)
+	inv_lbl.add_theme_font_size_override("font_size", 16)
+	inv_lbl.add_theme_color_override("font_color", Color(0.92, 0.88, 0.80))
+	inv_lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
+	inv_lbl.add_theme_constant_override("outline_size", 4)
+	inv_ctl.add_child(inv_lbl)
 	# menu principal : le couloir vit derrière (caméra qui dérive)
 	title_ctl = Control.new()
 	title_ctl.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -2131,7 +2546,7 @@ func _build_ui() -> void:
 	title_ctl.add_child(sb)
 	var vtag := Label.new()
 	vtag.name = "Ver"
-	vtag.text = "v17 DEMARCHE"
+	vtag.text = "v20 VISAGE"
 	vtag.position = Vector2(1180, 690)
 	vtag.size = Vector2(180, 24)
 	vtag.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -2642,6 +3057,11 @@ func _begin_run() -> void:
 	entity_mode = 0
 	chase_t = 0.0
 	_draw_loop()
+	if not decor_rich_done:
+		decor_rich_done = true
+		_decor_rich()
+	if menu_ent != null and is_instance_valid(menu_ent):
+		menu_ent.visible = false
 	_spawn_chaser()
 	poster_base = ["poster_a", "poster_c"][rng.randi_range(0, 1)]
 	candy_offer = []
@@ -2886,7 +3306,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 				bait_pos = Vector2(player.position.x, player.position.z) + Vector2(-sin(yaw), -cos(yaw)) * 2.5
 				bait_timer = 4.0
 				bait_level = player_level
-				play("creak", -6.0, 1.3)
+				play("creak", -2.0, 1.3)
 				_toast(tt("candy_throw"), 3.0)
 				_toast(tt("candy_throw"), 3.0)
 			if ev.keycode == KEY_F and pocket > 0:
@@ -2937,9 +3357,15 @@ func _unhandled_input(ev: InputEvent) -> void:
 				_toast("MONSTRE : %s" % kn, 2.5)
 			if ev.keycode == KEY_R:
 				_do_rewind()
+			if ev.keycode == KEY_I:
+				inv_open = not inv_open
+				if inv_ctl != null:
+					inv_ctl.visible = inv_open
+				if inv_open:
+					_refresh_inventory()
 				headlamp.visible = headlamp_on
 				dust.emitting = headlamp_on
-				play("creak", -14.0, 1.6)
+				play("creak", -4.0, 1.6)
 			if ev.keycode == KEY_F1:
 				hud_on = not hud_on
 				for n in hud_nodes:
@@ -2982,6 +3408,46 @@ func _toggle_quality() -> void:
 		lp[0].shadow_enabled = quality_high
 
 
+# ---- menu principal : le monstre rode en arriere-plan (v18d) ----
+func _menu_ent_ensure() -> Node3D:
+	# cree la creature du menu une seule fois (elle n'existait qu'apres le demarrage d'une partie)
+	if menu_ent != null and is_instance_valid(menu_ent):
+		return menu_ent
+	menu_ent = _make_entity()
+	if menu_ent != null:
+		world.add_child(menu_ent)
+		menu_ent.position = Vector3(10.0, _terrain_y(Vector2(10.0, 6.6), 0), 6.6)
+		menu_ent.rotation.y = PI * 0.5
+		menu_ent.visible = true
+	return menu_ent
+
+
+func _title_update(d: float) -> void:
+	title_cam_t += d * 0.5
+	var me := _menu_ent_ensure()
+	if me != null:
+		me.visible = true
+		menu_t += d
+		# patrouille en va-et-vient DANS le couloir (z = 6.6 : bande de 4 m libre de tout mur)
+		var u := fmod(menu_t * 0.20, 2.0)
+		var fr := u if u < 1.0 else 2.0 - u
+		var xc := 4.2 + fr * 8.5
+		me.position = Vector3(xc, _terrain_y(Vector2(xc, 6.6), 0), 6.6)
+		me.rotation.y = (-PI * 0.5) if u < 1.0 else (PI * 0.5)
+		ent_phase += d * 2.1
+		if _rig_st(me).is_empty():
+			_anim_entity3(me, d, title_cam_t, Vector2(player.position.x, player.position.z), 0)
+		else:
+			_anim_entity_rig(me, d, title_cam_t, Vector2(player.position.x, player.position.z), 0, 1.05)
+	# camera : bout est du couloir, regard vers l'ouest, leger balancement
+	yaw = PI * 0.5 + sin(title_cam_t * 0.13) * 0.05
+	pitch = -0.03
+	player.rotation = Vector3(0, yaw, 0)
+	cam.rotation = Vector3(pitch, 0, 0)
+	cam.position = Vector3(0, EYE, 0)
+	player.position = Vector3(18.3 + sin(title_cam_t * 0.09) * 0.35, 0, 7.0 + cos(title_cam_t * 0.11) * 0.22)
+
+
 # ============================================================ process =====
 func _process(d: float) -> void:
 	if dbg == "audit":
@@ -2994,6 +3460,16 @@ func _process(d: float) -> void:
 	if dbg == "shot":
 		_dbg_shot(d)
 		return
+	if dbg == "rig":
+		if not rig_dbg:
+			rig_dbg = true
+			_dbg_rig()
+		return
+	if dbg == "mvis":
+		if not mvis_run:
+			mvis_run = true
+			_dbg_menu_vis()
+		return
 	if vhs.material:
 		vhs.material.set_shader_parameter("time", Time.get_ticks_msec() / 1000.0)
 	if state == "intro":
@@ -3005,13 +3481,7 @@ func _process(d: float) -> void:
 			_begin_run()
 		return
 	if state == "title":
-		title_cam_t += d * 0.5
-		yaw = sin(title_cam_t * 0.10) * 0.6
-		pitch = -0.04
-		player.rotation = Vector3(0, yaw, 0)
-		cam.rotation = Vector3(pitch, 0, 0)
-		cam.position = Vector3(0, EYE, 0)
-		player.position = Vector3(10.0 + sin(title_cam_t * 0.11) * 4.0, 0, 7.0 + cos(title_cam_t * 0.07) * 0.8)
+		_title_update(d)
 		return
 	if state != "play":
 		return
@@ -3038,7 +3508,7 @@ func _process(d: float) -> void:
 				if env != null:
 					env.ambient_light_energy = 0.30
 				_toast(tt("blackout_end"), 2.5)
-				play("creak", -10.0, 1.4)
+				play("creak", -3.0, 1.4)
 		else:
 			blackout_cd -= d
 			if blackout_cd <= 0.0:
@@ -3105,7 +3575,7 @@ func _process(d: float) -> void:
 		player.velocity = Vector3(mv.x, 0, mv.z)
 		bob += d * (9.5 if want_sprint else 6.5)
 		if fmod(bob, TAU) < d * (9.5 if want_sprint else 6.5):
-			play("step", -19.0 if crouch else -12.0, randf_range(0.9, 1.1))
+			play("step", -13.0 if crouch else -5.0, randf_range(0.9, 1.1))
 	else:
 		player.velocity = Vector3.ZERO
 		bob = move_toward(bob, round(bob / TAU) * TAU, d * 4)
@@ -3230,6 +3700,7 @@ func _process(d: float) -> void:
 		if lock_cd <= 0.0:
 			lock_cd = 2.5
 			_toast(tt("locked"), 3.0)
+			play("lock", -3.0, 0.75)
 			play("creak", -4.0, 0.6)
 	if ch1_locked and has_key_ch1:
 		var d1v := Vector2(player.position.x - 12.55, player.position.z - 8.2)
@@ -3242,7 +3713,8 @@ func _process(d: float) -> void:
 				ch1_door_node.queue_free()
 				ch1_door_node = null
 			_toast(tt("unlocked"), 3.0)
-			play("chime", -8.0)
+			play("lock", -3.0, 1.05)
+			play("door_creak", -4.0)
 	hidden = false
 	for hs in HIDE_SPOTS:
 		var hl := 1 if hs.y > 1.0 else 0
@@ -3378,6 +3850,27 @@ func _process(d: float) -> void:
 		entity_target_pos = p2z
 		entity_target_lvl = player_level
 		_move_entity_toward(p2z, 3.6 if entity_mode == 2 else 2.2, d, player_level)
+		# v19 : anti-blocage — si elle n'avance plus alors qu'elle te traque, elle se deplace plus loin
+		rig_stuck_t += d
+		if rig_stuck_t >= 1.6:
+			if Vector2(entity.position.x, entity.position.z).distance_to(rig_stuck_pos) < 0.45:
+				var best6 := -1
+				var bd6 := -1.0
+				for i6 in range(3, NODES.size()):
+					if NODE_LVL[i6] != ent_level:
+						continue
+					var d6: float = (NODES[i6] - p2z).length()
+					if d6 > 7.0 and d6 < 30.0 and d6 > bd6:
+						bd6 = d6
+						best6 = i6
+				if best6 > 0:
+					entity.position = Vector3(NODES[best6].x, _terrain_y(NODES[best6], ent_level), NODES[best6].y)
+					entity_path.clear()
+					entity_target = best6
+					if dbg != "":
+						print("DBG declic anti-blocage -> noeud %d (%.1f m)" % [best6, bd6])
+			rig_stuck_t = 0.0
+			rig_stuck_pos = Vector2(entity.position.x, entity.position.z)
 	else:
 		if entity_mode == 1:
 			_move_entity_toward(entity_target_pos, 2.2, d)
@@ -3451,7 +3944,8 @@ func _process(d: float) -> void:
 		var tt2 := run_time * sp2
 		var mv2 := epos2 - p2z
 		if entity_mode == 2 and mv2.length_squared() > 0.01:
-			entity.rotation.y = atan2(-mv2.x, -mv2.y)
+			# v18 : mv2 va du joueur VERS elle -> pour lui FAIRE FACE il faut la direction opposee
+			entity.rotation.y = atan2(mv2.x, mv2.y)
 		elif entity_path.size() > 0 or mv2.length_squared() > 0.01:
 			var facedir := (epos2 - Vector2(entity.position.x, entity.position.z))
 			if facedir.length_squared() < 0.00001:
@@ -3478,8 +3972,18 @@ func _process(d: float) -> void:
 				var foren := armn.get_node_or_null("Fore")
 				if foren != null:
 					foren.rotation.x = (-0.5 if entity_mode == 2 else -0.08) + sin(tt2 * 5.7 + sgn) * 0.08
-		if ent_model_kind == 2:
-			_anim_entity3(d, tt2, p2z)
+		if _rig_st(entity).is_empty():
+			if ent_model_kind == 2:
+				_anim_entity3(entity, d, tt2, p2z, entity_mode)
+		else:
+			var spd := 1.15
+			if entity_mode == 2:
+				spd = 3.6
+			elif entity_mode == 1:
+				spd = 2.2
+			if ent_glued:
+				spd *= 0.4
+			_anim_entity_rig(entity, d, tt2, p2z, entity_mode, spd)
 		if ent_breath != null and is_instance_valid(ent_breath):
 			if not ent_breath.playing:
 				ent_breath.play()
@@ -3509,6 +4013,14 @@ func _process(d: float) -> void:
 			if legn != null:
 				legn.rotation.x = sin(ent_phase + (0.0 if ln2 == "LegL" else PI)) * (0.8 if entity_mode == 2 else 0.35)
 		entity.rotation.x = 0.14 if entity_mode == 2 else 0.04
+	# v18 : voyant de bruit discret + endurance affichee seulement si elle baisse
+	if noise_dot != null:
+		noise_dot.color.a = clampf(noise * 0.85, 0.0, 0.9)
+	if stam_lbl != null:
+		var show_stam := stamina < 0.55 and state == "play"
+		stam_lbl.visible = show_stam and hud_on
+		if show_stam:
+			stam_lbl.text = "ENDURANCE %d %%" % int(stamina * 100.0)
 	_cam_update(d)
 	if scare_t > 0.0:
 		scare_t += d
@@ -3552,6 +4064,114 @@ func _process(d: float) -> void:
 
 
 # ============================================================ debug =======
+func _dbg_rig() -> void:
+	# mesure EN MOTEUR : la creature skinee marche-t-elle sans patiner et sans traverser le sol ?
+	var e := _make_entity()
+	if e == null:
+		print("DBGRIG ECHEC construction")
+		get_tree().quit()
+		return
+	world.add_child(e)
+	e.position = Vector3(10.0, 0.0, 8.0)
+	var st := _rig_st(e)
+	if st.is_empty():
+		print("DBGRIG ECHEC squelette")
+		get_tree().quit()
+		return
+	var sk: Skeleton3D = st["skel"]
+	var dt := 1.0 / 30.0
+	var sp := 3.6
+	var pas := 0.0
+	var pen := 999.0
+	var appui_haut := -999.0
+	var derive := 0.0
+	var n_derive := 0
+	var prev := {}
+	var warm := 150
+	for i in range(warm + 90):
+		_anim_entity_rig(e, dt, i * dt, Vector2(0, 0), 2, sp)
+		e.position = Vector3(10.0, 0.0, 8.0 - pas)
+		pas += sp * dt
+		if i < warm:
+			continue
+		var g: float = st["gait"]
+		for side in ["L", "R"]:
+			var bn: String = "foot" + str(side)
+			var ph: float = fmod(g + (0.0 if side == "L" else 0.5), 1.0)
+			var pt := _rig_sole_world(sk, bn, rig_sole[0])   # toujours le meme point : mesure honnete
+			var bas := 999.0
+			for p in rig_sole:
+				bas = minf(bas, _rig_sole_world(sk, bn, p).y)
+			if ph < 0.58:
+				pen = minf(pen, bas)
+				appui_haut = maxf(appui_haut, bas)
+				if prev.has(bn):
+					var d2 := Vector2(pt.x - prev[bn].x, pt.z - prev[bn].z).length()
+					# le pied pose reste FIXE dans le monde -> dans le repere local il recule
+					# exactement de la distance parcourue par la creature
+					derive += absf(d2 - sp * dt)
+					n_derive += 1
+			prev[bn] = pt
+		if i % 30 == 0:
+			print("DBGRIG i=%d g=%.2f contact=%.4f" % [i, g, pen])
+	var moy := derive / float(maxi(1, n_derive))
+	print("DBGRIG RESUME : penetration max %.4f m | appui : point de contact entre %.4f et %.4f m | patinage moyen %.4f m/image (0 = parfait)"
+		% [pen, pen, appui_haut, moy])
+	print("DBGRIG os=%d chaine=%.4f hanche=%.4f cheville=%.4f semelle=%d pts" % [sk.get_bone_count(), rig_chain, rig_y_hip, rig_y_ank, rig_sole.size()])
+	get_tree().quit()
+
+
+func _rig_sole_world(sk: Skeleton3D, bname: String, p: Vector3) -> Vector3:
+	# le point est stocke DANS LE REPERE DE REPOS de l'os : la deformation est donc
+	# simplement pose_global * point (appliquer l'inverse du repos une 2e fois l'envoyait 1 m sous le sol)
+	var i := sk.find_bone(bname)
+	return (sk.get_bone_global_pose(i) * p) * rig_scale
+
+
+func _dbg_menu_vis() -> void:
+	# verifie sans rendu que la creature du menu est bien cadree et non masquee par un mur
+	state = "title"
+	title_ctl.visible = true
+	_menu_ent_ensure()
+	var tps := 0.0
+	var occupe := 0
+	var hors := 0
+	var n := 0
+	var ang_max := 0.0
+	var d_min := 999.0
+	var d_max := 0.0
+	var es := get_world_3d().direct_space_state
+	var k := 0
+	while tps < 30.0:
+		_title_update(0.1)
+		k += 1
+		tps += 0.1
+		if k % 8 == 0:
+			var cp: Vector3 = cam.global_position
+			var fwd: Vector3 = -cam.global_transform.basis.z
+			var tp: Vector3 = menu_ent.global_position + Vector3(0, 1.45, 0)
+			var to := tp - cp
+			var ang := rad_to_deg(fwd.angle_to(to))
+			var q := PhysicsRayQueryParameters3D.create(cp, tp)
+			q.collision_mask = 1
+			var h := es.intersect_ray(q)
+			n += 1
+			ang_max = maxf(ang_max, ang)
+			d_min = minf(d_min, to.length())
+			d_max = maxf(d_max, to.length())
+			var mur := ""
+			if not h.is_empty():
+				occupe += 1
+				mur = " OCCULTE(t=%.2f)" % (cp.distance_to(h["position"]) / to.length())
+			if ang > 40.0:
+				hors += 1
+			print("DBGMENU t=%.1f dist=%.2f angle=%.1f deg%s" % [tps, to.length(), ang, mur])
+	print("DBGMENU RESUME points=%d angle_max=%.1f deg occulte=%d hors_champ=%d dist=%.2f..%.2f" % [n, ang_max, occupe, hors, d_min, d_max])
+	var nx := menu_ent.position.x
+	print("DBGMENU creature=(%.2f, %.2f, %.2f) cameras=(%.2f, %.2f, %.2f)" % [nx, menu_ent.position.y, menu_ent.position.z, player.position.x, player.position.y, player.position.z])
+	get_tree().quit()
+
+
 func _dbg_shot(d: float) -> void:
 	if shot_i == 0 and shot_frames == 0 and env != null:
 		env.sdfgi_enabled = false
@@ -4083,6 +4703,7 @@ func _build_entity_model2() -> Node3D:
 	ent_sniff.max_distance = 14.0
 	ent_sniff.position = Vector3(0, 1.9, -0.2)
 	nd.add_child(ent_sniff)
+	nd.scale = Vector3(ENT_SCALE, ENT_SCALE, ENT_SCALE)
 	return nd
 
 
@@ -4290,22 +4911,165 @@ func _build_entity_model3() -> Node3D:
 	return nd
 
 
-func _anim_entity3(d: float, tt2: float, p2z: Vector2) -> void:
+func _rig_pose(sk: Skeleton3D, bname: String, rots: Array) -> void:
+	var i := sk.find_bone(bname)
+	if i < 0:
+		return
+	var q := Quaternion.IDENTITY
+	for r in rots:
+		q = q * Quaternion(r[0], r[1])
+	sk.set_bone_pose_rotation(i, q)
+
+
+func _rig_st(nd: Node3D) -> Dictionary:
+	if nd == null:
+		return {}
+	var id := nd.get_instance_id()
+	if not rig_state.has(id):
+		return {}
+	var st: Dictionary = rig_state[id]
+	if not is_instance_valid(st.get("skel")):
+		return {}
+	return st
+
+
+func _anim_entity_rig(nd: Node3D, d: float, tt2: float, p2z: Vector2, mode: int, speed_mps: float) -> void:
+	# v19 : animation de la creature skinee — jambes en IK, buste et bras en cinématique
+	var st := _rig_st(nd)
+	if st.is_empty():
+		return
+	var sk: Skeleton3D = st["skel"]
+	var md: Dictionary = RIG_MODES[clampi(mode, 0, 4)]
+	if st["can"].is_empty():
+		st["can"] = {"lean": md["lean"], "head_p": md["head_p"], "arm_x": md["arm_x"], "arm_z": md["arm_z"],
+			"elbow": md["elbow"], "sh_up": md["sh_up"], "chest_p": md["chest_p"], "amp": md["amp"],
+			"stride": md["stride"], "arm_fwd": md["arm_fwd"], "jaw": md["jaw"], "head_y": 0.0}
+		st["fil"] = {"thighL": 0.0, "shinL": 0.0, "footL": 0.0, "thighR": 0.0, "shinR": 0.0, "footR": 0.0}
+	var can: Dictionary = st["can"]
+	# --- regard : angle du joueur par rapport a l'axe du corps
+	var look := 0.0
+	var dirw := p2z - Vector2(nd.position.x, nd.position.z)
+	if dirw.length_squared() > 0.01:
+		look = clampf(wrapf(atan2(-dirw.x, -dirw.y) - nd.rotation.y, -PI, PI), -1.15, 1.15)
+	var kk := minf(1.0, (5.0 if mode == 2 else 3.6) * d)
+	for key in ["lean", "head_p", "arm_x", "arm_z", "elbow", "sh_up", "chest_p", "amp", "stride", "arm_fwd", "jaw"]:
+		can[key] = lerpf(float(can[key]), float(md[key]), kk)
+	can["head_y"] = lerpf(float(can["head_y"]), look, minf(1.0, 6.0 * d))
+	# --- allure : la phase avance avec la DISTANCE parcourue (l'appui dure 0,62 cycle)
+	var sp := speed_mps / rig_scale
+	if sp > 0.03:
+		st["gait"] = float(st["gait"]) + (sp * d) / maxf(0.08, float(can["stride"]) / 0.62)
+	var g: float = st["gait"]
+	var amp: float = can["amp"]
+	var sway := 0.045 * amp * sin(TAU * g)
+	var hips_pitch: float = can["lean"] * 0.30
+	var hips_roll := sway * 0.55
+	# --- bassin : hauteur calee sur la foulee maximale (constant sur le cycle : pas de pompage)
+	var half_max := minf(float(can["stride"]) * 0.5, rig_chain * 0.90)
+	# marge de 3,5 % sur la chaine : la jambe n'atteint JAMAIS sa butee (sinon l'IK sature
+	# et le pied pose se met a flotter)
+	var reach := rig_chain * 0.965
+	var need := sqrt(maxf(0.0009, reach * reach - half_max * half_max))
+	var bob := 0.020 * amp * absf(sin(TAU * g))
+	# le bassin monte/descend, mais la distance hanche->cheville reste constante :
+	# sans cette compensation la jambe s'allonge et le pied pose se met a flotter (7 cm)
+	var hips_off := (rig_y_ank + need) - rig_y_hip - bob
+	# --- jambes : IK 2 os, pied pose au sol
+	for side in ["L", "R"]:
+		var ph: float = fmod(g + (0.0 if side == "L" else 0.5), 1.0)
+		var fwd := 0.0
+		var lift := 0.0
+		var plantar := 0.0
+		if ph < 0.62:
+			fwd = float(can["stride"]) * (0.5 - ph / 0.62)
+			plantar = 0.55 * pow(maxf(0.0, (ph - 0.42) / 0.20), 2.0)
+		else:
+			var u := (ph - 0.62) / 0.38
+			var su := u * u * (3.0 - 2.0 * u)
+			fwd = float(can["stride"]) * (-0.5 + su)
+			lift = 0.14 * pow(sin(PI * u), 0.75) * (1.0 if mode >= 1 else 0.6)
+			plantar = -0.22 * sin(PI * u)
+		var sgn := 1.0 if side == "L" else -1.0
+		var dz := -fwd - (absf(rig_y_hip * 0.0) + 0.058) * sin(0.09 * amp * sin(TAU * g)) * sgn
+		var hip_y := rig_y_hip + hips_off + bob
+		var ank_y := lift + rig_y_ank + maxf(0.0, rig_sole_k0 - _rig_sole_low(plantar)) + 0.004
+		var down := hip_y - ank_y
+		var dist := minf(rig_chain, sqrt(dz * dz + down * down))
+		var cosk := (rig_l_thigh * rig_l_thigh + rig_l_shin * rig_l_shin - dist * dist) / (2.0 * rig_l_thigh * rig_l_shin)
+		var knee := PI - acos(clampf(cosk, -1.0, 1.0))
+		var cosc := (rig_l_thigh * rig_l_thigh + dist * dist - rig_l_shin * rig_l_shin) / (2.0 * rig_l_thigh * dist)
+		var beta := atan2(-dz, down)
+		var thigh_a := beta + acos(clampf(cosc, -1.0, 1.0))
+		var shin_abs := thigh_a - knee
+		var fil: Dictionary = st["fil"]
+		fil["thigh" + side] = lerpf(float(fil["thigh" + side]), (thigh_a - rig_b_thigh) - hips_pitch, minf(1.0, 16.0 * d))
+		fil["shin" + side] = lerpf(float(fil["shin" + side]), (shin_abs - thigh_a) - (rig_b_shin - rig_b_thigh), minf(1.0, 16.0 * d))
+		fil["foot" + side] = lerpf(float(fil["foot" + side]), (rig_b_foot + plantar) - shin_abs - (rig_b_foot - rig_b_shin), minf(1.0, 16.0 * d))
+		_rig_pose(sk, "thigh" + side, [[Vector3(1, 0, 0), float(fil["thigh" + side])],
+			[Vector3(0, 0, 1), -sgn * sway * 0.35 - hips_roll]])
+		_rig_pose(sk, "shin" + side, [[Vector3(1, 0, 0), float(fil["shin" + side])]])
+		_rig_pose(sk, "foot" + side, [[Vector3(1, 0, 0), float(fil["foot" + side])]])
+		_rig_pose(sk, "toe" + side, [])
+	# --- colonne, nuque, tete
+	_rig_pose(sk, "hips", [[Vector3(1, 0, 0), float(can["lean"]) * 0.30], [Vector3(0, 0, 1), sway * 0.55],
+		[Vector3(0, 1, 0), 0.09 * amp * sin(TAU * g) * 0.55]])
+	_rig_pose(sk, "spine", [[Vector3(1, 0, 0), float(can["lean"]) * 0.34], [Vector3(0, 0, 1), -sway * 0.30]])
+	var resp := 0.02 * sin(tt2 * 1.15) if mode == 0 else 0.03 * sin(tt2 * 3.1)
+	_rig_pose(sk, "chest", [[Vector3(1, 0, 0), float(can["lean"]) * 0.30 + float(can["chest_p"]) * 0.30 + resp],
+		[Vector3(0, 0, 1), -sway * 0.25]])
+	_rig_pose(sk, "neck", [[Vector3(1, 0, 0), float(can["head_p"]) * 0.35 + resp * 0.6],
+		[Vector3(0, 1, 0), float(can["head_y"]) * 0.35]])
+	_rig_pose(sk, "head", [[Vector3(1, 0, 0), float(can["head_p"]) * 0.65 + 0.05 * sin(tt2 * 3.7) + (0.09 if mode >= 2 else 0.0)],
+		[Vector3(0, 1, 0), float(can["head_y"]) * 0.65 + 0.09 * sin(tt2 * 0.63)],
+		[Vector3(0, 0, 1), 0.05 * sin(tt2 * 1.9)]])
+	# --- machoire : ouverte en chasse, avec claquements ; negative = elle descend (mesure)
+	var ouv := float(can["jaw"])
+	if mode == 2:
+		ouv += 0.20 * pow(maxf(0.0, sin(tt2 * 7.0)), 3.0)
+	elif mode == 3:
+		ouv += 0.12 * absf(sin(tt2 * 9.0))
+	_rig_pose(sk, "jaw", [[Vector3(1, 0, 0), -ouv]])
+	# --- bras : balancier oppose aux jambes + pose de chasse (mains vers l'avant)
+	for side in ["L", "R"]:
+		var ph2: float = fmod(g + (0.5 if side == "L" else 0.0), 1.0)
+		var sgn2 := 1.0 if side == "L" else -1.0
+		var sw := sin(TAU * ph2) * 0.42 * amp
+		var ax: float = float(can["arm_x"]) + sw * (0.5 if mode != 0 else 0.15)
+		var az: float = float(can["arm_z"]) * sgn2
+		_rig_pose(sk, "clav" + side, [[Vector3(0, 0, 1), -sgn2 * float(can["sh_up"]) * 0.30]])
+		_rig_pose(sk, "upperarm" + side, [[Vector3(1, 0, 0), ax], [Vector3(0, 0, 1), az],
+			[Vector3(0, 1, 0), -sgn2 * (0.10 + float(can["arm_fwd"]))]])
+		_rig_pose(sk, "forearm" + side, [[Vector3(1, 0, 0), float(can["elbow"]) - absf(sw) * 0.22]])
+		_rig_pose(sk, "hand" + side, [[Vector3(1, 0, 0), -0.18 + 0.10 * sin(tt2 * 5.1 + sgn2)],
+			[Vector3(0, 0, 1), az * 0.4]])
+	# --- bassin : translation (hauteur + oscillation)
+	var ih := sk.find_bone("hips")
+	if ih >= 0:
+		var rp := sk.get_bone_rest(ih).origin
+		sk.set_bone_pose_position(ih, rp + Vector3(0, hips_off + bob, 0))
+	# --- pas : un bruit par demi-cycle
+	if ent_step != null and is_instance_valid(ent_step) and nd == entity and sp > 0.03:
+		if floor(g * 2.0) != floor(float(st["step"]) * 2.0):
+			if not ent_step.playing:
+				ent_step.pitch_scale = 1.12 if mode == 2 else 1.0
+				ent_step.volume_db = -4.0 if mode == 2 else -10.0
+				ent_step.play()
+		st["step"] = g
+
+
+func _anim_entity3(nd: Node3D, d: float, tt2: float, p2z: Vector2, mode: int) -> void:
 	# marche a 10 parties : hanches, genoux, epaules, coudes, balancement du corps
-	var bd := entity.get_node_or_null("Body")
-	var hd := entity.get_node_or_null("Head")
-	var auR := entity.get_node_or_null("ArmUpperR")
-	var auL := entity.get_node_or_null("ArmUpperL")
-	var thR := entity.get_node_or_null("ThighR")
-	var thL := entity.get_node_or_null("ThighL")
+	var bd := nd.get_node_or_null("Body")
+	var hd := nd.get_node_or_null("Head")
+	var auR := nd.get_node_or_null("ArmUpperR")
+	var auL := nd.get_node_or_null("ArmUpperL")
+	var thR := nd.get_node_or_null("ThighR")
+	var thL := nd.get_node_or_null("ThighL")
 	if bd == null or thR == null or thL == null:
 		return
-	var ch := entity_mode == 2
-	var al := entity_mode == 1
+	var ch := mode == 2
+	var al := mode == 1
 	var amp := 0.78 if ch else (0.46 if al else 0.34)
-	if dbg != "" and ent_anim_dbg < 3:
-		ent_anim_dbg += 1
-		print("DBG anim3 phase=%.2f mode=%d amp=%.2f attente" % [ent_phase, entity_mode, amp])
 	var cad := 1.0
 	if thR is Node3D and thL is Node3D:
 		thR.rotation.x = sin(ent_phase) * amp
@@ -4320,8 +5084,8 @@ func _anim_entity3(d: float, tt2: float, p2z: Vector2) -> void:
 		var base := -1.05 if ch else -0.10
 		auR.rotation.x = base + sin(ent_phase + PI) * (0.55 if ch else amp * 0.85)
 		auL.rotation.x = base + sin(ent_phase) * (0.55 if ch else amp * 0.85)
-		auR.rotation.z = -0.528 + (0.32 if ch else 0.0)
-		auL.rotation.z = 0.528 - (0.32 if ch else 0.0)
+		auR.rotation.z = -0.528
+		auL.rotation.z = 0.528
 		var flR := auR.get_node_or_null("ArmLower")
 		var flL := auL.get_node_or_null("ArmLower")
 		if flR != null:
@@ -4336,15 +5100,15 @@ func _anim_entity3(d: float, tt2: float, p2z: Vector2) -> void:
 	# tete : elle te regarde quand elle te cherche ou te chasse
 	if hd != null:
 		var want := 0.0
-		if entity_mode >= 1:
-			var dirw := p2z - Vector2(entity.position.x, entity.position.z)
+		if mode >= 1:
+			var dirw := p2z - Vector2(nd.position.x, nd.position.z)
 			if dirw.length_squared() > 0.01:
-				want = wrapf(atan2(-dirw.x, -dirw.y) - entity.rotation.y, -PI, PI)
+				want = wrapf(atan2(-dirw.x, -dirw.y) - nd.rotation.y, -PI, PI)
 		hd.rotation.y = lerp_angle(hd.rotation.y, clampf(want, -0.9, 0.9), minf(1.0, 4.0 * d))
 		hd.rotation.z = sin(tt2 * 7.3) * 0.05
 		hd.rotation.x = sin(tt2 * 3.1) * 0.04 - 0.10 - (0.20 if ch else 0.0)
 	# pas de la creature, synchronises sur l'animation
-	if ent_step != null and is_instance_valid(ent_step):
+	if ent_step != null and is_instance_valid(ent_step) and mode == 0 and nd == entity:
 		if floor(ent_phase / PI) != floor(ent_prev_phase / PI) and ent_phase > ent_prev_phase:
 			if not ent_step.playing:
 				ent_step.pitch_scale = 1.12 if ch else (1.0 if al else 0.9)
@@ -4358,3 +5122,22 @@ func _anim_entity3(d: float, tt2: float, p2z: Vector2) -> void:
 func _ent_asleep() -> bool:
 	# elle dort tant que tu n'as pas touche a une note ET que les 75 premieres secondes ne sont pas passees
 	return run_time < ent_spawn_delay and notes_found == 0
+
+
+func _ent_can_stand(p2: Vector2) -> bool:
+	# v18 : verifie qu'aucun mur ne bloque la creature a cet endroit (capsule de 0,45 m de rayon)
+	if world == null or not world.is_inside_tree():
+		return true
+	var space := world.get_world_3d().direct_space_state
+	if space == null:
+		return true
+	var q := PhysicsShapeQueryParameters3D.new()
+	var sh := SphereShape3D.new()
+	sh.radius = 0.50
+	q.shape = sh
+	q.transform = Transform3D(Basis(), Vector3(p2.x, 1.05, p2.y))
+	q.collision_mask = 1
+	q.collide_with_bodies = true
+	q.collide_with_areas = false
+	var hits := space.intersect_shape(q, 1)
+	return hits.is_empty()
