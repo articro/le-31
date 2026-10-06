@@ -111,3 +111,31 @@ Le projet « Marmite & Monstres » est ABANDONNÉ par l'utilisateur : ne JAMAIS 
   deplacement de frame.
 - Validation : AUDIT ALL OK (122 bodies) ; bot quiet seed 5 = WIN (1 prise) ; `--dbg=cam` = 5 piles,
   grade 1,0, batterie 100 -> 87,6, traînee 76 points.
+
+### v15 MOUVEMENT — le monstre T-pose de l'utilisateur, en 6 parties animes (2026-10-05)
+- **Fichier recu** : `monstreTpose.glb` (4 837 856 o, 99 897 tri, 2 webp 1024, 0 skin) depose par l'utilisateur
+  a la RACINE du repo -> range dans `assets/models/monstre_tpose.glb`.
+  **ATTENTION** : son `clé.glb` est un **duplicata octet-pour-octet du monstre** (md5 20f207e1..., meme taille) :
+  la generation de la cle a echoue silencieusement. A refaire.
+- **Decoupe `tools_split_tpose.py`** : 6 parties (body 63 741 / head 7 664 / legR 8 472 / legL 8 328 /
+  armR 5 723 / armL 5 969 tri), echelle 2,35 m, pieds y=0, visage -Z, pivots hanches 0,94 / cou 2,00 /
+  **epaules ( 0,30 ; 1,88)**. Methode de segmentation : jambes = y < 0,94 puis **test axe du bras**
+  (t plus grand que 0,05 et perpendiculaire < 0,16 le long de l'axe epaule->main) — indispensable car
+  les PIEDS ecartes (jusqu'a 0,56 m) tombaient sinon dans les bras. Piege : tester les 2 cotes en
+  MIRROIR (l'axe gauche = axe droit avec x inverse), sinon le bras gauche part dans le corps.
+- **Pose en jeu** : bras a 47,7 deg sous l'horizontale dans le modele -> `rotation.z = -+0,528 rad` pour les
+  faire pendre (mains a x 0,49 / y 0,98) ; jambes resserrees de `-+0,20 rad` (ecart des pieds 1,12 -> ~0,72 m).
+- **Animation des bras (patch_v15a)** : ils sont maintenant **separes** donc reellement animes
+  (balancement en marche, lever avant en chasse), branchges sur `ent_model_kind` :
+  1 = v15 (6 parties) par defaut, 0 = v13 (4 parties). **F3 bascule les deux a chaud** (rebuild de l'entite
+  en conservant position et mode) ; `--dbg=model1` force la v13, `--dbg=m2` verifie la structure (nouveau test).
+- **Cles** : remplacees par une vraie forme 3D (`_key_model()` : tige cylindrique + anneau torus + panneton
+  + 2 dents) et **rotation lente** en jeu (0,7 rad/s).
+- **TRELLIS.2 par API (gradio_client)** : l'API fonctionne depuis la sandbox (`/start_session`,
+  `/preprocess_image`, `/image_to_3d` avec resolution 512/1024/1536, `/extract_glb` avec decimation_target
+  et texture_size) MAIS le **quota ZeroGPU anonyme est epuise** (~180 s de GPU par jour et par IP ;
+  une generation demande 120 s). Message : "Authenticate with a Hugging Face token for more quota".
+  -> Reessayer le lendemain, ou demander un **jeton HF gratuit** (read) a l'utilisateur pour generer
+  d'un coup cle + TV + poupee + horloge via `/home/user/tools/trellis_gen.py` (deja ecrit).
+- Validation : AUDIT ALL OK (122 bodies) ; bot quiet seed 5 = WIN ; `--dbg=m2` = 99 897 tri repartis ;
+  camera v14 intacte. Release **404060487** (tag v15 = 27604f69, 173 blobs, zip 74 101 123 o).

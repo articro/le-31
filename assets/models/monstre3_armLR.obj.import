@@ -1,0 +1,22 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://cld1ypxn4ob3b"
+path="res://.godot/imported/monstre3_armLR.obj-3704932d13175caa3f32cdf6b5e316bf.mesh"
+
+[deps]
+
+files=["res://.godot/imported/monstre3_armLR.obj-3704932d13175caa3f32cdf6b5e316bf.mesh"]
+
+source_file="res://assets/models/monstre3_armLR.obj"
+dest_files=["res://.godot/imported/monstre3_armLR.obj-3704932d13175caa3f32cdf6b5e316bf.mesh", "res://.godot/imported/monstre3_armLR.obj-3704932d13175caa3f32cdf6b5e316bf.mesh"]
+
+[params]
+
+generate_tangents=true
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+optimize_mesh=true
+force_disable_mesh_compression=false

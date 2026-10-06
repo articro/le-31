@@ -23,6 +23,9 @@ const TR := {
 		"cam_empty": "BATTERIE VIDE \u2014 le caméscope s'éteint",
 		"cam_pile": "PILE +%d%%",
 		"cam_pick": "[R] rembobiner  \u00b7  [PILES] recharger le caméscope",
+		"heard": "ELLE A ENTENDU QUELQUE CHOSE. Elle arrive.",
+		"hide_warn": "NE BOUGE PLUS. Elle est juste à côté.",
+		"hide_busted": "ELLE T'A ENTENDU BOUGER !",
 		"play": "ENTRER",
 		"warn": "casque recommandé — ne joue pas dans le noir… ou si.",
 		"controls": "ZQSD / WASD / flèches : marcher · MAJ : courir (endurance !) · SOURIS : regarder · CLIC DROIT ou T : CAMÉSCOPE (voir dans le noir) · R : REMBOBINER 20 s (batterie + ça l'attire) · G : lampe torche · E : lancer un bonbon (diversion) · F : sucre collant (ralentit) · V : grain VHS · ÉCHAP : pause",
@@ -141,6 +144,9 @@ const TR := {
 		"cam_empty": "BATTERY DEAD \u2014 the camcorder shuts off",
 		"cam_pile": "BATTERY +%d%%",
 		"cam_pick": "[R] rewind  \u00b7  [BATTERIES] recharge the camcorder",
+		"heard": "SHE HEARD SOMETHING. She is coming.",
+		"hide_warn": "DO NOT MOVE. She is right next to you.",
+		"hide_busted": "SHE HEARD YOU MOVE!",
 		"play": "ENTER",
 		"warn": "headphones recommended — don't play in the dark… actually, do.",
 		"controls": "WASD / ZQSD / arrows: walk · SHIFT: run (stamina!) · MOUSE: look · RIGHT CLICK or T: CAMCORDER (see in the dark) · R: REWIND 20 s (battery + it draws her) · G: flashlight · E: throw candy (decoy) · F: sticky sugar (slows her) · V: VHS grain · ESC: pause",
@@ -400,7 +406,19 @@ void fragment() {
 }
 """
 # ================= v15 : monstre a 6 parties (T-pose, bras animes) =================
-var ent_model_kind := 1        # 1 = v15 (6 parties) · 0 = v13 (4 parties)
+var ent_model_kind := 2        # 2 = v17 (10 parties) · 1 = v15 (6) · 0 = v13 (4)
+var ent_prev_phase := 0.0
+var ent_anim_dbg := 0
+var ent_step: AudioStreamPlayer3D = null
+var ent_spawn_delay := 75.0    # v17 : elle dort tant que tu n'as pas touche a une note (ou 75 s)
+var creek_sfx_t := 6.0
+# ================= v16 : laisse d'ecoute + discipline de cachette =================
+var heard_pos := Vector2.ZERO
+var heard_lvl := 0
+var heard_t := 0.0
+var heard_cd := 0.0
+var hide_warn_cd := 0.0
+var hide_busted := false
 var dbg_m2_i := 0
 var cam_held := false          # clic droit maintenu
 var cam_sticky := false        # T (bascule)
@@ -1219,7 +1237,11 @@ func _make_pumpkin(at: Vector3, scale := 1.0) -> Node3D:
 
 func _make_entity() -> Node3D:
 	# v15 : monstre T-pose a 6 parties (bras animes) par defaut ; v13 en repli ; --dbg=model1 force la v13.
-	if dbg != "nomodel" and dbg != "model1" and ent_model_kind == 1 and ResourceLoader.exists("res://assets/models/monstre2_body.obj"):
+	if dbg != "nomodel" and dbg != "model1" and ent_model_kind == 2 and ResourceLoader.exists("res://assets/models/monstre3_body.obj"):
+		var md3 := _build_entity_model3()
+		if md3 != null:
+			return md3
+	if dbg != "nomodel" and dbg != "model1" and ent_model_kind >= 1 and ResourceLoader.exists("res://assets/models/monstre2_body.obj"):
 		var md2 := _build_entity_model2()
 		if md2 != null:
 			return md2
@@ -1791,13 +1813,22 @@ func _spawn_chaser() -> void:
 		return
 	entity = _make_entity()
 	var p2 := Vector2(player.position.x, player.position.z)
-	var opts := []
+	# v17 : elle apparait LE PLUS LOIN possible du joueur (demande utilisateur)
+	var cands: Array = []
 	for i3 in range(3, NODES.size()):
-		if NODE_LVL[i3] == 0 and (NODES[i3] - p2).length() > 7.0 and (NODES[i3] - exit_pos).length() > 4.0:
-			opts.append(i3)
+		if NODE_LVL[i3] == 0:
+			var dd: float = (NODES[i3] - p2).length()
+			if (NODES[i3] - exit_pos).length() > 5.0:
+				cands.append([dd, i3])
+	cands.sort_custom(func(a, b): return a[0] > b[0])
+	var opts := []
+	for c in cands.slice(0, mini(3, cands.size())):
+		opts.append(c[1])
 	if opts.is_empty():
 		opts = [6]
 	entity_node = opts[rng.randi_range(0, opts.size() - 1)]
+	if dbg != "":
+		print("DBG spawn node=%d dist_joueur=%.1f (candidats=%s)" % [entity_node, (NODES[entity_node] - p2).length(), str(opts)])
 	entity_target = entity_node
 	entity.position = Vector3(NODES[entity_node].x, 0, NODES[entity_node].y)
 	world.add_child(entity)
@@ -2100,7 +2131,7 @@ func _build_ui() -> void:
 	title_ctl.add_child(sb)
 	var vtag := Label.new()
 	vtag.name = "Ver"
-	vtag.text = "v15 MOUVEMENT"
+	vtag.text = "v17 DEMARCHE"
 	vtag.position = Vector2(1180, 690)
 	vtag.size = Vector2(180, 24)
 	vtag.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -2587,6 +2618,12 @@ func _begin_run() -> void:
 	rewinding = 0.0
 	rewind_cd = 0.0
 	lowbatt_t = 1.5
+	heard_t = 0.0
+	heard_cd = 0.0
+	ent_prev_phase = 0.0
+	creek_sfx_t = 6.0
+	hide_warn_cd = 0.0
+	hide_busted = false
 	trail.clear()
 	trail_t = 0.0
 	for pi2 in range(piles.size()):
@@ -2881,7 +2918,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 					cam_sticky = false
 					_toast(tt("cam_empty"), 3.0)
 			if ev.keycode == KEY_F3:
-				ent_model_kind = 1 - ent_model_kind
+				ent_model_kind = (ent_model_kind + 2) % 3
 				var kp := Vector3.ZERO
 				var km := entity_mode
 				if entity != null and is_instance_valid(entity):
@@ -2892,7 +2929,12 @@ func _unhandled_input(ev: InputEvent) -> void:
 				if entity != null and is_instance_valid(entity):
 					entity.position = kp
 					entity_mode = km
-				_toast("MONSTRE : %s" % ("v15 SIX PARTIES (bras animes)" if ent_model_kind == 1 else "v13 QUATRE PARTIES"), 2.5)
+				var kn := "v13 QUATRE PARTIES"
+				if ent_model_kind == 1:
+					kn = "v15 SIX PARTIES"
+				elif ent_model_kind == 2:
+					kn = "v17 DIX PARTIES (genoux + coudes)"
+				_toast("MONSTRE : %s" % kn, 2.5)
 			if ev.keycode == KEY_R:
 				_do_rewind()
 				headlamp.visible = headlamp_on
@@ -3129,13 +3171,21 @@ func _process(d: float) -> void:
 	if candies.get("sucre", false):
 		target_noise *= 0.7
 	noise = lerpf(noise, target_noise, 0.15)
+	# --- v17 : lattes de plancher qui grincent quand tu marches (demande utilisateur) ---
+	creek_sfx_t -= d
+	if creek_sfx_t <= 0.0 and mv.length_squared() > 0.01 and player_level == 0:
+		var sprinting := want_sprint and stamina > 0.05
+		creek_sfx_t = rng.randf_range(2.5, 5.5) if sprinting else rng.randf_range(6.0, 13.0)
+		if rng.randf() < (0.8 if sprinting else 0.55):
+			play("creak", -2.0, rng.randf_range(0.85, 1.18))
+			noise = maxf(noise, 0.45 if sprinting else 0.30)
 	var p2z := Vector2(player.position.x, player.position.z)
 	player_level = 1 if player.position.y > 1.6 else 0
 	for zi in range(CREEK_ZONES.size()):
 		creek_cd[zi] = maxf(0.0, creek_cd[zi] - d)
 		if creek_cd[zi] <= 0.0 and player_level == 0 and (Vector2(CREEK_ZONES[zi].x, CREEK_ZONES[zi].y) - p2z).length() < CREEK_ZONES[zi].z:
 			creek_cd[zi] = 3.0
-			play("creak", -8.0, 0.8)
+			play("creak", -2.0, 0.85)
 			noise = maxf(noise, 1.0)
 	for ci in range(CANDY_SPOTS.size()):
 		if not candy_taken[ci] and (Vector2(CANDY_SPOTS[ci].x, CANDY_SPOTS[ci].z) - p2z).length() < 0.9 and player_level == (1 if CANDY_SPOTS[ci].y > 1.0 else 0):
@@ -3156,20 +3206,21 @@ func _process(d: float) -> void:
 			notes_found += 1
 			if ni2 < note_meshes.size() and is_instance_valid(note_meshes[ni2]):
 				note_meshes[ni2].queue_free()
-			play("whisper", -6.0)
+			play("paper", -4.0)
+			play("whisper", -8.0)
 			_toast(tt("note_%d" % (ni2 + 1)), 6.5)
 			alert_t = maxf(alert_t, 1.0)
 	if key_mesh_e != null and is_instance_valid(key_mesh_e) and key_mesh_e.visible:
 		if p2z.distance_to(key_exit_pos) < 0.9 and player_level == key_exit_lvl:
 			has_key_exit = true
 			key_mesh_e.visible = false
-			play("chime", -5.0)
+			play("key_jingle", -3.0)
 			_toast(tt("key_pick_e"), 3.5)
 	if key_mesh_c != null and is_instance_valid(key_mesh_c) and key_mesh_c.visible:
 		if p2z.distance_to(key_ch1_pos) < 0.9 and player_level == key_ch1_lvl:
 			has_key_ch1 = true
 			key_mesh_c.visible = false
-			play("chime", -5.0)
+			play("key_jingle", -3.0)
 			_toast(tt("key_pick_c"), 3.5)
 	var dexit: float = (exit_pos - p2z).length()
 	if dexit < 1.4:
@@ -3200,6 +3251,22 @@ func _process(d: float) -> void:
 			if hide_cd <= 0.0:
 				hide_cd = 4.0
 				_toast(tt("hidden_t"), 3.0)
+			# --- v16 : cachee ne veut pas dire sauvee — ne bouge pas ---
+			var de := 0.0
+			if entity != null and is_instance_valid(entity):
+				de = Vector2(entity.position.x, entity.position.z).distance_to(p2z)
+			if de < 4.5 and player_level == ent_level and not hide_busted:
+				if hide_warn_cd <= 0.0:
+					hide_warn_cd = 8.0
+					_toast(tt("hide_warn"), 3.0)
+					play("heart", -5.0)
+				if player.velocity.length() > 0.30:
+					hide_busted = true
+					hidden = false
+					entity_mode = 2
+					chase_t = 0.0
+					play("scare", -3.0)
+					_toast(tt("hide_busted"), 3.0)
 	for gi in range(glue_zones.size() - 1, -1, -1):
 		glue_zones[gi][1] -= d
 		if glue_zones[gi][1] <= 0.0:
@@ -3219,12 +3286,54 @@ func _process(d: float) -> void:
 		entity_mode = 0
 		entity_target = _node_of(epos2, ent_level)
 	var hear_r := noise * 14.0
+	if _ent_asleep():
+		# v17 : dormance — elle reste invisible et immobile loin dans la maison (demande utilisateur)
+		hear_r = 0.0
+		bait_timer = 0.0
+		heard_t = 0.0
+		entity_mode = 0
+		entity_target = entity_node
+		entity.position = Vector3(NODES[entity_node].x, _terrain_y(NODES[entity_node], ent_level), NODES[entity_node].y)
+		entity.visible = false
+	elif not entity.visible:
+		# REVEIL : elle repart du point le plus eloigne de toi (demande utilisateur : « plus loin dans la map »)
+		var best_n := entity_node
+		var best_d := -1.0
+		for i5 in range(3, NODES.size()):
+			if NODE_LVL[i5] == 0 and (NODES[i5] - exit_pos).length() > 5.0:
+				var d5: float = (NODES[i5] - p2z).length()
+				if d5 > best_d:
+					best_d = d5
+					best_n = i5
+		entity_node = best_n
+		ent_level = 0
+		entity.position = Vector3(NODES[entity_node].x, _terrain_y(NODES[entity_node], 0), NODES[entity_node].y)
+		entity_path.clear()
+		entity.visible = true
+		play("sting", -9.0)
+		play("growl", -14.0)
+		if dbg != "":
+			print("DBG envol t=%.1f dist=%.1f" % [run_time, best_d])
 	if hidden:
 		hear_r = 0.0
 	if player_level != ent_level:
 		hear_r *= 0.25
 	if dbg == "smart" or dbg == "blind":
 		hear_r = 0.0
+	# --- v16 : laisse d'ecoute — un bruit fort la fait venir de loin ---
+	if heard_cd > 0.0:
+		heard_cd -= d
+	if noise > 0.85 and heard_cd <= 0.0 and not hidden:
+		# elle entend A TRAVERS les murs et les etages : elle sait ou tu es passe
+		heard_pos = p2z
+		heard_lvl = player_level
+		heard_t = 6.0
+		heard_cd = 6.0
+		if dist > 4.0:
+			play("growl", -12.0)
+			_toast(tt("heard"), 2.6)
+		if dbg != "":
+			print("DBG heard_event pos=%s lvl=%d dist=%.1f mode=%d" % [str(p2z), player_level, dist, entity_mode])
 	if bait_timer > 0.0:
 		bait_timer -= d
 		entity_mode = 1
@@ -3249,6 +3358,16 @@ func _process(d: float) -> void:
 			entity_mode = 0
 			chase_t = 0.0
 			entity_target = _node_of(epos2, ent_level)
+	elif heard_t > 0.0 and not hidden:
+		# v16 : elle sait OU tu as fait du bruit et elle y va (etage compris)
+		heard_t -= d
+		entity_mode = 1
+		_move_entity_toward(heard_pos, 2.5, d, heard_lvl)
+		if (heard_pos - epos2).length() < 0.9:
+			heard_t = 0.0
+			entity_target = _node_of(epos2, ent_level)
+			if dbg != "":
+				print("DBG heard_arrived t=%.1f" % run_time)
 	elif dist < hear_r:
 		if noise > 0.6 and dist < 6.0:
 			entity_mode = 2
@@ -3287,7 +3406,7 @@ func _process(d: float) -> void:
 							break
 				entity_target = pick
 				tgt = NODES[entity_target]
-			_move_entity_toward(tgt, 1.15, d, NODE_LVL[entity_target])
+			_move_entity_toward(tgt, 0.0 if _ent_asleep() else 1.15, d, NODE_LVL[entity_target])
 	epos2 = Vector2(entity.position.x, entity.position.z)
 	dist = (epos2 - p2z).length()
 	entity.visible = true
@@ -3359,6 +3478,8 @@ func _process(d: float) -> void:
 				var foren := armn.get_node_or_null("Fore")
 				if foren != null:
 					foren.rotation.x = (-0.5 if entity_mode == 2 else -0.08) + sin(tt2 * 5.7 + sgn) * 0.08
+		if ent_model_kind == 2:
+			_anim_entity3(d, tt2, p2z)
 		if ent_breath != null and is_instance_valid(ent_breath):
 			if not ent_breath.playing:
 				ent_breath.play()
@@ -3563,6 +3684,7 @@ func _dbg_audit(d: float) -> void:
 			if nb < 40:
 				fail = "solid"
 		1:
+			ent_spawn_delay = 0.0
 			_begin_run()
 			player.position = Vector3(CANDY_SPOTS[0].x, 0, CANDY_SPOTS[0].z)
 		2:
@@ -3989,5 +4111,250 @@ func _dbg_m2(d: float) -> void:
 		total += tris
 		print("DBG m2 node=%-5s tri=%-6d pos=%s rot=%s" % [c.name, tris, c.position.snapped(Vector3(0.01, 0.01, 0.01)), c.rotation.snapped(Vector3(0.01, 0.01, 0.01))])
 	print("DBG m2 total_tris=", total)
-	print("DBG m2 OK")
+	# v17 : verifier aussi le modele a 10 parties
+	var m3 := _build_entity_model3()
+	if m3 == null:
+		print("DBG m3=ECHEC")
+		get_tree().quit(1)
+		return
+	var tot3 := 0
+	for c3 in m3.get_children():
+		if not (c3 is Node3D):
+			continue
+		var t3 := 0
+		if c3 is MeshInstance3D and c3.mesh is ArrayMesh:
+			t3 = ((c3.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
+		else:
+			for cc3 in c3.get_children():
+				if cc3 is MeshInstance3D and cc3.mesh is ArrayMesh:
+					t3 += ((cc3.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
+				elif cc3 is Node3D:
+					for cc4 in cc3.get_children():
+						if cc4 is MeshInstance3D and cc4.mesh is ArrayMesh:
+							t3 += ((cc4.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
+		tot3 += t3
+		print("DBG m3 node=%-11s tri=%-6d pos=%s rot=%s enfants=%d" % [c3.name, t3, c3.position.snapped(Vector3(0.01, 0.01, 0.01)), c3.rotation.snapped(Vector3(0.01, 0.01, 0.01)), c3.get_child_count()])
+	print("DBG m3 total_tris=", tot3)
+	print("DBG m3 OK")
 	get_tree().quit(0)
+
+
+# ============================================== v17 : monstre 10 parties (genoux+coudes) ==
+func _build_entity_model3() -> Node3D:
+	var b3 = load("res://assets/models/monstre3_body.obj")
+	var h3 = load("res://assets/models/monstre3_head.obj")
+	var aUr = load("res://assets/models/monstre3_armUR.obj")
+	var aLr = load("res://assets/models/monstre3_armLR.obj")
+	var aUl = load("res://assets/models/monstre3_armUL.obj")
+	var aLl = load("res://assets/models/monstre3_armLL.obj")
+	var tR = load("res://assets/models/monstre3_thighR.obj")
+	var sR = load("res://assets/models/monstre3_shinR.obj")
+	var tL = load("res://assets/models/monstre3_thighL.obj")
+	var sL = load("res://assets/models/monstre3_shinL.obj")
+	var tx3 = load("res://assets/models/monstre2_tex.png")
+	for m0 in [b3, h3, aUr, aLr, aUl, aLl, tR, sR, tL, sL, tx3]:
+		if m0 == null:
+			return null
+	if dbg != "":
+		print("DBG entity=MODEL3D DIX PARTIES (genoux + coudes)")
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = tx3
+	m.albedo_color = Color(0.70, 0.68, 0.66)
+	m.roughness = 0.74
+	m.metallic = 0.0
+	m.subsurf_scatter_enabled = true
+	m.subsurf_scatter_strength = 0.14
+	m.rim_enabled = true
+	m.rim = 0.55
+	m.rim_tint = 0.6
+	m.cull_mode = StandardMaterial3D.CULL_DISABLED
+	var nd := Node3D.new()
+	var HIP := 0.94
+	var NECK := 2.00
+	var SHY := 1.88
+	var SHX := 0.30
+	var ELB := Vector3(0.32, -0.352, 0.0)
+	var KNE := Vector3(0.373, -0.47, 0.0)
+	var body := MeshInstance3D.new()
+	body.name = "Body"
+	body.mesh = b3
+	body.material_override = m
+	body.position = Vector3(0, HIP, 0)
+	nd.add_child(body)
+	# articulations visibles (cachent les coupes)
+	for j in [[Vector3(0, 0, 0), 0.115], [Vector3(SHX, 0, 0), 0.085], [Vector3(-SHX, 0, 0), 0.085]]:
+		var js := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = j[1]
+		sm.height = j[1] * 2.0
+		js.mesh = sm
+		js.material_override = m
+		js.position = j[0]
+		body.add_child(js)
+	# bras : epaule -> coude
+	for pr in [["ArmUpperR", aUr, SHX, -0.528, ELB], ["ArmUpperL", aUl, -SHX, 0.528, Vector3(-ELB.x, ELB.y, 0)]]:
+		var ap := Node3D.new()
+		ap.name = pr[0]
+		ap.position = Vector3(pr[2], SHY, 0)
+		ap.rotation = Vector3(0, 0, pr[3])
+		var mi := MeshInstance3D.new()
+		mi.mesh = pr[1]
+		mi.material_override = m
+		ap.add_child(mi)
+		var jo := MeshInstance3D.new()
+		var jm := SphereMesh.new()
+		jm.radius = 0.062
+		jm.height = 0.124
+		jo.mesh = jm
+		jo.material_override = m
+		jo.position = pr[4]
+		ap.add_child(jo)
+		var fp := Node3D.new()
+		fp.name = "ArmLower"
+		fp.position = pr[4]
+		var mi2 := MeshInstance3D.new()
+		mi2.mesh = (aLr if pr[0].ends_with("R") else aLl)
+		mi2.material_override = m
+		fp.add_child(mi2)
+		ap.add_child(fp)
+		nd.add_child(ap)
+	# jambes : hanche -> genou
+	for pr2 in [["ThighR", tR, -0.20, KNE], ["ThighL", tL, 0.20, Vector3(-KNE.x, KNE.y, 0)]]:
+		var lp := Node3D.new()
+		lp.name = pr2[0]
+		lp.position = Vector3(0, HIP, 0)
+		lp.rotation = Vector3(0, 0, pr2[2])
+		var mi3 := MeshInstance3D.new()
+		mi3.mesh = pr2[1]
+		mi3.material_override = m
+		lp.add_child(mi3)
+		var jk := MeshInstance3D.new()
+		var km := SphereMesh.new()
+		km.radius = 0.078
+		km.height = 0.156
+		jk.mesh = km
+		jk.material_override = m
+		jk.position = pr2[3]
+		lp.add_child(jk)
+		var sp := Node3D.new()
+		sp.name = "Shin"
+		sp.position = pr2[3]
+		var mi4 := MeshInstance3D.new()
+		mi4.mesh = (sR if pr2[0].ends_with("R") else sL)
+		mi4.material_override = m
+		sp.add_child(mi4)
+		lp.add_child(sp)
+		nd.add_child(lp)
+	var hd := Node3D.new()
+	hd.name = "Head"
+	hd.position = Vector3(0, NECK, 0)
+	var hm := MeshInstance3D.new()
+	hm.mesh = h3
+	hm.material_override = m
+	hd.add_child(hm)
+	nd.add_child(hd)
+	var aura := OmniLight3D.new()
+	aura.light_color = Color(0.72, 0.68, 0.62)
+	aura.light_energy = 0.30
+	aura.omni_range = 1.9
+	aura.position = Vector3(0, 1.5, 0)
+	nd.add_child(aura)
+	ent_breath = AudioStreamPlayer3D.new()
+	ent_breath.stream = load("res://assets/audio/breath.wav")
+	ent_breath.volume_db = -22.0
+	ent_breath.unit_size = 6.0
+	ent_breath.max_distance = 16.0
+	ent_breath.position = Vector3(0, 1.9, 0)
+	nd.add_child(ent_breath)
+	ent_growl = AudioStreamPlayer3D.new()
+	ent_growl.stream = load("res://assets/audio/growl.wav")
+	ent_growl.volume_db = -8.0
+	ent_growl.unit_size = 9.0
+	ent_growl.max_distance = 26.0
+	ent_growl.position = Vector3(0, 1.7, 0)
+	nd.add_child(ent_growl)
+	ent_sniff = AudioStreamPlayer3D.new()
+	ent_sniff.stream = load("res://assets/audio/sniff.wav")
+	ent_sniff.volume_db = -10.0
+	ent_sniff.unit_size = 5.0
+	ent_sniff.max_distance = 14.0
+	ent_sniff.position = Vector3(0, 1.9, -0.2)
+	nd.add_child(ent_sniff)
+	ent_step = AudioStreamPlayer3D.new()
+	ent_step.stream = load("res://assets/audio/mstep.wav")
+	ent_step.volume_db = -8.0
+	ent_step.unit_size = 7.0
+	ent_step.max_distance = 22.0
+	ent_step.position = Vector3(0, 0.15, 0)
+	nd.add_child(ent_step)
+	return nd
+
+
+func _anim_entity3(d: float, tt2: float, p2z: Vector2) -> void:
+	# marche a 10 parties : hanches, genoux, epaules, coudes, balancement du corps
+	var bd := entity.get_node_or_null("Body")
+	var hd := entity.get_node_or_null("Head")
+	var auR := entity.get_node_or_null("ArmUpperR")
+	var auL := entity.get_node_or_null("ArmUpperL")
+	var thR := entity.get_node_or_null("ThighR")
+	var thL := entity.get_node_or_null("ThighL")
+	if bd == null or thR == null or thL == null:
+		return
+	var ch := entity_mode == 2
+	var al := entity_mode == 1
+	var amp := 0.78 if ch else (0.46 if al else 0.34)
+	if dbg != "" and ent_anim_dbg < 3:
+		ent_anim_dbg += 1
+		print("DBG anim3 phase=%.2f mode=%d amp=%.2f attente" % [ent_phase, entity_mode, amp])
+	var cad := 1.0
+	if thR is Node3D and thL is Node3D:
+		thR.rotation.x = sin(ent_phase) * amp
+		thL.rotation.x = sin(ent_phase + PI) * amp
+		var shR := thR.get_node_or_null("Shin")
+		var shL := thL.get_node_or_null("Shin")
+		if shR != null:
+			shR.rotation.x = -maxf(0.0, sin(ent_phase + 0.75)) * (1.15 if ch else 0.72)
+		if shL != null:
+			shL.rotation.x = -maxf(0.0, sin(ent_phase + PI + 0.75)) * (1.15 if ch else 0.72)
+	if auR != null and auL != null:
+		var base := -1.05 if ch else -0.10
+		auR.rotation.x = base + sin(ent_phase + PI) * (0.55 if ch else amp * 0.85)
+		auL.rotation.x = base + sin(ent_phase) * (0.55 if ch else amp * 0.85)
+		auR.rotation.z = -0.528 + (0.32 if ch else 0.0)
+		auL.rotation.z = 0.528 - (0.32 if ch else 0.0)
+		var flR := auR.get_node_or_null("ArmLower")
+		var flL := auL.get_node_or_null("ArmLower")
+		if flR != null:
+			flR.rotation.x = (-0.95 if ch else -0.34) + sin(ent_phase + PI) * 0.18
+		if flL != null:
+			flL.rotation.x = (-0.95 if ch else -0.34) + sin(ent_phase) * 0.18
+	# balancement + tanguage du corps
+	bd.position.y = 0.94 + absf(sin(ent_phase)) * (0.055 if ch else 0.030) - (0.028 if ch else 0.015)
+	bd.rotation.z = sin(ent_phase) * (0.075 if ch else 0.045)
+	bd.rotation.y = sin(ent_phase * 0.5) * 0.05
+	bd.rotation.x = (0.10 if ch else 0.02) + absf(sin(ent_phase * 2.0)) * 0.02
+	# tete : elle te regarde quand elle te cherche ou te chasse
+	if hd != null:
+		var want := 0.0
+		if entity_mode >= 1:
+			var dirw := p2z - Vector2(entity.position.x, entity.position.z)
+			if dirw.length_squared() > 0.01:
+				want = wrapf(atan2(-dirw.x, -dirw.y) - entity.rotation.y, -PI, PI)
+		hd.rotation.y = lerp_angle(hd.rotation.y, clampf(want, -0.9, 0.9), minf(1.0, 4.0 * d))
+		hd.rotation.z = sin(tt2 * 7.3) * 0.05
+		hd.rotation.x = sin(tt2 * 3.1) * 0.04 - 0.10 - (0.20 if ch else 0.0)
+	# pas de la creature, synchronises sur l'animation
+	if ent_step != null and is_instance_valid(ent_step):
+		if floor(ent_phase / PI) != floor(ent_prev_phase / PI) and ent_phase > ent_prev_phase:
+			if not ent_step.playing:
+				ent_step.pitch_scale = 1.12 if ch else (1.0 if al else 0.9)
+				ent_step.volume_db = -3.0 if ch else -11.0
+				ent_step.play()
+		ent_prev_phase = ent_phase
+	else:
+		ent_prev_phase = ent_phase
+
+
+func _ent_asleep() -> bool:
+	# elle dort tant que tu n'as pas touche a une note ET que les 75 premieres secondes ne sont pas passees
+	return run_time < ent_spawn_delay and notes_found == 0
