@@ -65,4 +65,7 @@ récupérer depuis la release GitHub (`LE31_projet_godot_v12.zip`), jamais deman
   (le .glb la référence). Si elle disparaît : effacer `monstre_rig.glb.import`, `rm -rf .godot/imported/*rig*` puis `--import`.
 * Reconstruction totale : `bash /home/user/REBUILD_v20.sh` (rig → peau → semelle → zip).
 * Le dossier `.godot/` est supprimé volontairement (78 Mo, régénérable) : le premier `--import` prend ~5 min.
-* Ordre des patchs sur base neuve : `v15a → v16a → v17a → v18a → v18b → v18d → v19a`.
+* **Plus besoin de la chaine de patchs** : le depot GitHub contient la version a jour de `scripts/main.gd`.
+  Les nouveaux patchs sont dans le depot (`tools/`) : `rig_monstre.py` (squelette + poids), `patch_jaw.py`
+  (machoire + dents), `skin_tex.py` (peau/visage en UV), `sole_extract.py` (contact des pieds),
+  `anim_ref.py` (animation de reference). Reconstruction : `bash REBUILD_v20.sh`.
