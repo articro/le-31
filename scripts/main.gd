@@ -408,9 +408,9 @@ void fragment() {
 # ================= v15 : monstre a 6 parties (T-pose, bras animes) =================
 var ent_model_kind := 2        # 2 = v17 (10 parties) · 1 = v15 (6) · 0 = v13 (4)
 # ---- v19 : creature skinee (monstre_rig.glb, 21 os, peau continue) ----
-var rig_enabled := true
+var rig_enabled := false   # v21c : procedural texture PAR DEFAUT (rendu fiable, valide v9-v12) ; F3 = bascule vers le rig skinne
 var rig_state := {}            # instance_id -> {skel, mesh, gait, can, fil}
-var rig_scale := 2.40   # v21a : 2,80 -> 2,40 m (trop geante sous plafond 2,82 ; reste imposante)
+var rig_scale := 2.20   # v21c : rig skinne (option F3) aligne sur 2,20 m
 var rig_y_hip := 0.4154
 var rig_y_ank := 0.0904
 var rig_l_thigh := 0.1838
@@ -431,7 +431,7 @@ const RIG_MODES := {
 	4: {"lean": 0.60, "head_p": 0.12, "arm_x": 0.35, "arm_z": 0.50, "arm_fwd": -1.30, "elbow": -0.50, "sh_up": 0.40, "chest_p": 0.30, "amp": 0.80, "stride": 0.34, "jaw": 0.26},
 }
 var rig_dbg := false
-const ENT_SCALE := 1.021       # v21a : repli procedural aligne sur 2,40 m
+const ENT_SCALE := 0.936       # v21c : 2,20 m (lisible sous plafond 2,82, passe les portes visuellement)
 var ent_prev_phase := 0.0
 var ent_anim_dbg := 0
 var ent_step: AudioStreamPlayer3D = null
@@ -3486,7 +3486,8 @@ func _unhandled_input(ev: InputEvent) -> void:
 					cam_sticky = false
 					_toast(tt("cam_empty"), 3.0)
 			if ev.keycode == KEY_F3:
-				ent_model_kind = (ent_model_kind + 2) % 3
+				# v21c : F3 bascule procedural <-> rig skinne (le procedural est le rendu sur)
+				rig_enabled = not rig_enabled
 				var kp := Vector3.ZERO
 				var km := entity_mode
 				if entity != null and is_instance_valid(entity):
@@ -3497,12 +3498,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 				if entity != null and is_instance_valid(entity):
 					entity.position = kp
 					entity_mode = km
-				var kn := "v13 QUATRE PARTIES"
-				if ent_model_kind == 1:
-					kn = "v15 SIX PARTIES"
-				elif ent_model_kind == 2:
-					kn = "v17 DIX PARTIES (genoux + coudes)"
-				_toast("MONSTRE : %s" % kn, 2.5)
+				_toast("MONSTRE : %s" % ("RIG SKINNE (experimental)" if rig_enabled else "PROCEDURAL (sur)"), 2.5)
 			if ev.keycode == KEY_R:
 				_do_rewind()
 			if ev.keycode == KEY_I:
