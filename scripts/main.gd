@@ -1178,8 +1178,8 @@ func _build_house() -> void:
 	for wz in [10.3, 12.9]:
 		for wx in [2.9, 5.5]:
 			_furn(Vector3(0.7, 0.7, 0.25), Vector3(wx, 0.35, wz), _simple(Color(0.05, 0.05, 0.05), 0.8))
-	_cc0("res://assets/cc0/bookcaseOpen.obj", Vector3(6.8, 0, 10.9), PI / 2, 0.2)   # etageres garage (v25fix : loin de la voiture)
-	_cc0("res://assets/cc0/bookcaseOpen.obj", Vector3(6.8, 0, 12.5), PI / 2, 0.2)
+	_cc0("res://assets/cc0/bookcaseOpen.obj", Vector3(4.8, 0, 13.5), PI, 0.2)   # etageres garage (v25fix3 : fond du garage, degage voiture + escalier)
+	_cc0("res://assets/cc0/bookcaseOpen.obj", Vector3(6.4, 0, 13.5), PI, 0.2)
 	# ================= v23 : AILE EST — la maison s'agrandit (tres grande maison) =================
 	_room_floor(20, 0, 30, 5.0, fw)
 	_room_floor(20, 5.0, 30, 9.0, fw)
