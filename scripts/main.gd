@@ -503,6 +503,8 @@ var clock_pl: AudioStreamPlayer3D = null
 # ---- v22d : poupee qui regarde, boite a musique (dormance), jumpscare d'absence ----
 var doll_head: Node3D = null
 var doll_root: Node3D = null
+var veil_sack: MeshInstance3D = null
+var veil_skel: Skeleton3D = null
 var music_box_pl: AudioStreamPlayer = null
 var absence_t := 0.0
 var creek_sfx_t := 6.0
@@ -994,6 +996,24 @@ func _next_mat(key: String) -> ShaderMaterial:
 	return m
 
 
+func _renorm(inst: Node3D) -> void:
+	# v25 : les GLB des sites arrivent SANS NORMALES -> rendu noir/piquant.
+	# On recalcule normales + tangentes surface par surface.
+	for mi in inst.find_children("*", "MeshInstance3D"):
+		var m3 := mi as MeshInstance3D
+		var old: Mesh = m3.mesh
+		if old == null or old.get_surface_count() == 0:
+			continue
+		var nm := ArrayMesh.new()
+		for s in range(old.get_surface_count()):
+			var st := SurfaceTool.new()
+			st.create_from(old, s)
+			st.generate_normals()
+			st.generate_tangents()
+			nm.add_surface_from_arrays(st.get_primitive_type(), st.commit_to_arrays())
+		m3.mesh = nm
+
+
 func _load_next(res: String, key: String, at: Vector3, s: float, ry := 0.0, collide := true, col_sz := Vector3.ZERO, col_at := Vector3.ZERO, attach := true) -> Node3D:
 	# v24 : modele GLB "next" colore + collision optionnelle
 	var ps: PackedScene = load(res)
@@ -1003,6 +1023,7 @@ func _load_next(res: String, key: String, at: Vector3, s: float, ry := 0.0, coll
 	inst.scale = Vector3(s, s, s)
 	inst.position = at
 	inst.rotation.y = ry
+	_renorm(inst)
 	var m := _next_mat(key)
 	for nd in inst.find_children("*", "MeshInstance3D"):
 		(nd as MeshInstance3D).material_override = m
@@ -1245,11 +1266,16 @@ func _build_house() -> void:
 		rail.rotation = Vector3(ramp_ang, 0, 0)
 		world.add_child(rail)
 	# ---- v23 : 2e escalier, ÉTAGE -> GRENIER (la maison gagne un niveau) ----
+	# v25 : limons PLEINS (poutre solide sous les marches, plus d'echelles flottantes)
 	var ramp2_len := sqrt(4.0 * 4.0 + 2.4 * 2.4)
 	var ramp2_ang := atan2(2.4, 4.0)
+	var beam2 := _box(Vector3(1.24, 1.5, ramp2_len + 0.4), woodm)
+	beam2.position = Vector3(3.8, 2.98 + 0.45, 10.3)
+	beam2.rotation = Vector3(ramp2_ang, 0, 0)
+	world.add_child(beam2)
 	for sx2 in [3.26, 4.34]:
-		var str2 := _box(Vector3(0.08, 0.60, ramp2_len + 0.7), woodm)
-		str2.position = Vector3(sx2, 2.98 + 1.08, 10.3)
+		var str2 := _box(Vector3(0.08, 0.55, ramp2_len + 0.7), woodm)
+		str2.position = Vector3(sx2, 2.98 + 1.15, 10.3)
 		str2.rotation = Vector3(ramp2_ang, 0, 0)
 		world.add_child(str2)
 	_collider_ramp(Vector3(1.1, 0.16, ramp2_len), Vector3(3.8, 4.18, 10.3), ramp2_ang)
@@ -1785,27 +1811,26 @@ func _build_entity_rig() -> Node3D:
 			m.rim_enabled = true
 			m.rim = 0.42
 			m.rim_tint = 0.5
-			# v24 : LA VOILEE — robe de deuil noire (le sac de jute couvre la tete)
-			m.albedo_color = Color(0.06, 0.055, 0.06)
+			# v24 : LA VOILEE — robe de deuil sombre mais LISIBLE (v25 : plus de noir pur)
+			m.albedo_color = Color(0.13, 0.12, 0.13)
+			m.rim = 0.25
 			mi.material_override = m
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-	# v24 : sac de jute couse sur le crane, suit l'os head (BoneAttachment)
-	var ba := BoneAttachment3D.new()
-	ba.bone_name = "head"
-	sk.add_child(ba)
+	# v25 : sac de jute = suivi de l'os head par frame (BoneAttachment se placait au torse)
+	veil_skel = sk
 	var sack := MeshInstance3D.new()
 	var skm := SphereMesh.new()
 	skm.radius = 0.082
 	skm.height = 0.20
 	sack.mesh = skm
 	sack.scale = Vector3(1.05, 1.45, 1.15)
-	sack.position = Vector3(0, 0.07, 0.01)
 	var jm := _simple(Color(0.42, 0.30, 0.17), 0.95)
 	jm.normal_enabled = true
 	jm.normal_texture = load("res://assets/tex/skin_normal.png")
 	jm.normal_scale = 2.2
 	sack.material_override = jm
-	ba.add_child(sack)
+	inst.add_child(sack)
+	veil_sack = sack
 	inst.scale = Vector3(rig_scale, rig_scale, rig_scale)
 	var aura := OmniLight3D.new()
 	aura.light_color = Color(0.72, 0.68, 0.62)
@@ -4156,6 +4181,13 @@ func _process(d: float) -> void:
 			if Vector2(dd.x, dd.z).length() < 10.0:
 				want = atan2(-dd.x, -dd.z)
 		doll_root.rotation.y = lerpf(doll_root.rotation.y, want, minf(1.0, 1.2 * d))
+	# v25 : le sac de jute colle au crane de la Voilee
+	if veil_sack != null and is_instance_valid(veil_sack) and veil_skel != null and is_instance_valid(veil_skel):
+		var bi := veil_skel.find_bone("head")
+		if bi >= 0:
+			var bp := veil_skel.get_bone_global_pose(bi)
+			veil_sack.global_position = bp.origin + bp.basis.y * 0.05
+			veil_sack.global_rotation = Vector3(0, entity.rotation.y, 0)
 	# v24 : la Marionnette (reserve, bibliotheque) se tourne vers toi si tu t'approches
 	if marion_root != null and is_instance_valid(marion_root):
 		var md := player.position - marion_root.position
