@@ -408,7 +408,7 @@ void fragment() {
 # ================= v15 : monstre a 6 parties (T-pose, bras animes) =================
 var ent_model_kind := 2        # 2 = v17 (10 parties) · 1 = v15 (6) · 0 = v13 (4)
 # ---- v19 : creature skinee (monstre_rig.glb, 21 os, peau continue) ----
-var rig_enabled := true   # v23 : LE MONSTRE IMPORTE (monstre_rig.glb, rig skinne) PAR DEFAUT — demande utilisateur ; F3 = bascule procedural
+var rig_enabled := false  # v25fix : le rig skinne rendait « araignee piquante » en jeu — PAR DEFAUT procedural (sur) ; F3 = bascule rig
 var rig_state := {}            # instance_id -> {skel, mesh, gait, can, fil}
 var rig_scale := 2.20   # v21c : rig skinne (option F3) aligne sur 2,20 m
 var rig_y_hip := 0.4154
@@ -665,12 +665,14 @@ func _box(sz: Vector3, m: StandardMaterial3D) -> MeshInstance3D:
 
 
 # ---- v22a : props open source Kenney (CC0) ----
-func _cc0(res: String, at: Vector3, ry: float, s: float, collide := true) -> Node3D:
+func _cc0(res: String, at: Vector3, ry: float, s: float, collide := true, omat: StandardMaterial3D = null) -> Node3D:
 	var nd := Node3D.new()
 	nd.position = at
 	nd.rotation.y = ry
 	var mi := MeshInstance3D.new()
 	mi.mesh = load(res)
+	if omat != null:
+		mi.material_override = omat   # v25fix : reteinte forcee (meubles trop pales)
 	nd.add_child(mi)
 	nd.scale = Vector3(s, s, s)
 	world.add_child(nd)
@@ -1073,7 +1075,8 @@ func _build_house() -> void:
 	var fw := _pbr("floor")
 	fw.normal_enabled = false
 	var tilem := _pixel("res://assets/tex/tile.png")
-	tilem.roughness = 0.35
+	tilem.roughness = 0.7                     # v25fix : carrelage MAT (reflets eblouissants)
+	tilem.albedo_color = Color(0.55, 0.56, 0.60)   # v25fix : carrelage assombri
 	# sols
 	_room_floor(0, 5.0, 20, 9.0, fw)
 	_room_floor(0, 0, 7, 5.0, fw)
@@ -1155,13 +1158,16 @@ func _build_house() -> void:
 	_cc0("res://assets/cc0/plantSmall1.obj", Vector3(0.5, 0, 0.5), 0.3, 0.25)
 	_cc0("res://assets/cc0/lampRoundFloor.obj", Vector3(2.0, 0, 5.6), 0.0, 0.174, false)
 	# cuisine — v22a : vrais meubles CC0
+	var kdwm := _simple(Color(0.13, 0.08, 0.05), 0.85)   # v25fix : bois fonce (table/chaises trop pales)
+	var kgr := _simple(Color(0.20, 0.20, 0.22), 0.6)     # v25fix : electro gris sombre (cubes blancs)
+	var shd := _simple(Color(0.16, 0.18, 0.19), 0.5)     # v25fix : douche gris sombre (panneau menthe)
 	_cc0("res://assets/cc0/kitchenCabinet.obj", Vector3(10.0, 0, 0.5), PI, 0.209)
 	_cc0("res://assets/cc0/kitchenSink.obj", Vector3(8.2, 0, 0.5), PI, 0.209)
 	_cc0("res://assets/cc0/kitchenStove.obj", Vector3(12.2, 0, 0.5), PI, 0.163)
 	_cc0("res://assets/cc0/kitchenFridge.obj", Vector3(14.0, 0, 0.5), PI, 0.185)
-	_cc0("res://assets/cc0/table.obj", Vector3(9.5, 0, 3.5), 0.0, 0.17)   # table cuisine + chaises
-	_cc0("res://assets/cc0/chairRounded.obj", Vector3(9.5, 0, 2.7), PI, 0.16)
-	_cc0("res://assets/cc0/chairRounded.obj", Vector3(9.5, 0, 4.3), 0.0, 0.16)
+	_cc0("res://assets/cc0/table.obj", Vector3(9.5, 0, 3.5), 0.0, 0.17, true, kdwm)   # table cuisine + chaises (v25fix foncees)
+	_cc0("res://assets/cc0/chairRounded.obj", Vector3(9.5, 0, 2.7), PI, 0.16, true, kdwm)
+	_cc0("res://assets/cc0/chairRounded.obj", Vector3(9.5, 0, 4.3), 0.0, 0.16, true, kdwm)
 	# salle de bains — v22a : vrais sanitaires CC0
 	_cc0("res://assets/cc0/bathtub.obj", Vector3(18.8, 0, 1.2), PI / 2, 0.134)
 	_cc0("res://assets/cc0/bathroomSink.obj", Vector3(14.0, 0, 0.5), PI, 0.152)
@@ -1171,8 +1177,8 @@ func _build_house() -> void:
 	for wz in [10.3, 12.9]:
 		for wx in [2.9, 5.5]:
 			_furn(Vector3(0.7, 0.7, 0.25), Vector3(wx, 0.35, wz), _simple(Color(0.05, 0.05, 0.05), 0.8))
-	_cc0("res://assets/cc0/bookcaseOpen.obj", Vector3(6.0, 0, 10.9), PI / 2, 0.2)   # etageres garage
-	_cc0("res://assets/cc0/bookcaseOpen.obj", Vector3(6.0, 0, 12.5), PI / 2, 0.2)
+	_cc0("res://assets/cc0/bookcaseOpen.obj", Vector3(6.8, 0, 10.9), PI / 2, 0.2)   # etageres garage (v25fix : loin de la voiture)
+	_cc0("res://assets/cc0/bookcaseOpen.obj", Vector3(6.8, 0, 12.5), PI / 2, 0.2)
 	# ================= v23 : AILE EST — la maison s'agrandit (tres grande maison) =================
 	_room_floor(20, 0, 30, 5.0, fw)
 	_room_floor(20, 5.0, 30, 9.0, fw)
@@ -1213,7 +1219,7 @@ func _build_house() -> void:
 	_cc0("res://assets/cc0/books.obj", Vector3(21.4, 0, 11.9), 1.9, 0.22, false)
 	_cc0("res://assets/cc0/rugRectangle.obj", Vector3(22.5, 0.02, 7.0), 0.0, 0.20, false)
 	# chambre d'enfant (est de l'aile, pres de la sortie)
-	_cc0("res://assets/cc0/bedBunk.obj", Vector3(28.7, 0, 2.2), PI / 2, 0.16)
+	_cc0("res://assets/cc0/bedBunk.obj", Vector3(28.9, 0, 2.2), PI / 2, 0.16)   # v25fix : colle au mur est (ne flotte plus)
 	_cc0("res://assets/cc0/bear.obj", Vector3(26.2, 0, 1.0), 0.6, 0.11)
 	_cc0("res://assets/cc0/sideTableDrawers.obj", Vector3(26.1, 0, 3.2), PI / 2, 0.103)
 	_cc0("res://assets/cc0/lampRoundTable.obj", Vector3(26.1, 0.42, 3.2), 0.0, 0.09, false)
@@ -1227,24 +1233,29 @@ func _build_house() -> void:
 	# lampes de l'aile (une allumee, deux grillees)
 	var wl_i := 0
 	for wl in [Vector2(22.5, 3.0), Vector2(22.5, 11.0), Vector2(27.5, 7.0)]:
-		world.add_child(_make_lamp(Vector3(wl.x, 0, wl.y), wl_i == 2))
+		world.add_child(_make_lamp(Vector3(wl.x, 0, wl.y), wl_i == 2 or wl_i == 0))   # v25fix : bibliotheque eclairee (plus de « trou noir »)
 		wl_i += 1
 	# ---- v23 : plus de props CC0 dans l'ancienne maison ----
 	_cc0("res://assets/cc0/loungeChairRelax.obj", Vector3(5.6, 0, 4.5), -PI / 2, 0.18)
 	_cc0("res://assets/cc0/coatRackStanding.obj", Vector3(19.3, 0, 9.5), 0.4, 0.19, false)
-	_cc0("res://assets/cc0/kitchenBlender.obj", Vector3(9.2, 0.78, 3.4), 0.9, 0.09, false)
-	_cc0("res://assets/cc0/kitchenCoffeeMachine.obj", Vector3(9.8, 0.78, 3.6), 2.4, 0.09, false)
-	_cc0("res://assets/cc0/kitchenMicrowave.obj", Vector3(8.7, 0.78, 3.7), 1.2, 0.09, false)
-	_cc0("res://assets/cc0/shower.obj", Vector3(19.2, 0, 3.9), PI, 0.14)
+	_cc0("res://assets/cc0/kitchenBlender.obj", Vector3(9.2, 0.78, 3.4), 0.9, 0.09, false, kgr)
+	_cc0("res://assets/cc0/kitchenCoffeeMachine.obj", Vector3(9.8, 0.78, 3.6), 2.4, 0.09, false, kgr)
+	_cc0("res://assets/cc0/kitchenMicrowave.obj", Vector3(8.7, 0.78, 3.7), 1.2, 0.09, false, kgr)
+	_cc0("res://assets/cc0/shower.obj", Vector3(19.2, 0, 3.9), PI, 0.14, true, shd)
 	_cc0("res://assets/cc0/cabinetBedDrawer.obj", Vector3(11.0, 0, 13.7), PI, 0.15)
 	# escalier du garage -> ÉTAGE (rampe physique + marches déco)
 	var ramp_len := sqrt(5.15 * 5.15 + 2.98 * 2.98)
 	var ramp_ang := atan2(2.98, 5.15)
 	# v22b : escalier PROPRE — limons pleins + palier ; plus aucune poutre qui depasse
 	# (le collider de rampe, lui, reste : physique validee par l'audit)
+	# v25fix : limons PLEINS hauts (plus d'effet echelle) + poutre sous la rampe
+	var beam1 := _box(Vector3(1.24, 1.3, ramp_len + 0.4), woodm)
+	beam1.position = Vector3(1.5, 0.95, 9.95)
+	beam1.rotation = Vector3(ramp_ang, 0, 0)
+	world.add_child(beam1)
 	for sx in [0.90, 2.10]:
-		var strn := _box(Vector3(0.08, 0.60, ramp_len + 0.7), woodm)
-		strn.position = Vector3(sx, 1.38, 9.95)
+		var strn := _box(Vector3(0.08, 1.0, ramp_len + 0.7), woodm)
+		strn.position = Vector3(sx, 1.62, 9.95)
 		strn.rotation = Vector3(ramp_ang, 0, 0)
 		world.add_child(strn)
 	var land := _box(Vector3(1.24, 0.12, 1.0), woodm)
@@ -1261,11 +1272,6 @@ func _build_house() -> void:
 	var post := _box(Vector3(0.12, 1.4, 0.12), woodm)
 	post.position = Vector3(1.5, 0.7, 12.5)
 	world.add_child(post)
-	for rx in [0.92, 2.08]:
-		var rail := _box(Vector3(0.06, 0.5, ramp_len), woodm)
-		rail.position = Vector3(rx, 1.49 + 0.42, 9.92)
-		rail.rotation = Vector3(ramp_ang, 0, 0)
-		world.add_child(rail)
 	# ---- v23 : 2e escalier, ÉTAGE -> GRENIER (la maison gagne un niveau) ----
 	# v25 : limons PLEINS (poutre solide sous les marches, plus d'echelles flottantes)
 	var ramp2_len := sqrt(4.0 * 4.0 + 2.4 * 2.4)
@@ -1274,9 +1280,9 @@ func _build_house() -> void:
 	beam2.position = Vector3(3.8, 2.98 + 0.45, 10.3)
 	beam2.rotation = Vector3(ramp2_ang, 0, 0)
 	world.add_child(beam2)
-	for sx2 in [3.26, 4.34]:
-		var str2 := _box(Vector3(0.08, 0.55, ramp2_len + 0.7), woodm)
-		str2.position = Vector3(sx2, 2.98 + 1.15, 10.3)
+	for sx2 in [3.26, 4.34]:   # v25fix : limons pleins hauts — plus d'echelle flottante
+		var str2 := _box(Vector3(0.08, 1.2, ramp2_len + 0.7), woodm)
+		str2.position = Vector3(sx2, 4.3, 10.3)
 		str2.rotation = Vector3(ramp2_ang, 0, 0)
 		world.add_child(str2)
 	_collider_ramp(Vector3(1.1, 0.16, ramp2_len), Vector3(3.8, 4.18, 10.3), ramp2_ang)
@@ -1287,11 +1293,7 @@ func _build_house() -> void:
 		var ris2 := _box(Vector3(1.1, 0.124, 0.04), woodm)
 		ris2.position = Vector3(3.8, s2y, s2z + 0.12)
 		world.add_child(ris2)
-	for rx2 in [3.28, 4.32]:
-		var rail2 := _box(Vector3(0.06, 0.5, ramp2_len), woodm)
-		rail2.position = Vector3(rx2, 4.18 + 0.42, 10.3)
-		rail2.rotation = Vector3(ramp2_ang, 0, 0)
-		world.add_child(rail2)
+
 	# dalle de l'étage (trémie au-dessus de la rampe) + murs hauts + toit
 	var slabm := _pbr("ceil")
 	for sp in [Vector3(0.4, 2.9, 7.0), Vector3(11.1, 2.9, 7.0), Vector3(1.5, 2.9, 3.45), Vector3(1.5, 2.9, 11.05)]:
@@ -1415,11 +1417,11 @@ func _build_house() -> void:
 	exit_door = Node3D.new()
 	exit_door.position = Vector3(exit_pos.x + 0.2, 0, exit_pos.y)
 	# v23 : porte de sortie ETEINTE — elle ne s'illumine QUE quand on sort enfin (demande utilisateur)
-	var eqm := _emissive(Color(0.15, 0.12, 0.09), 0.0, "res://assets/tex/exit.png")
+	var eqm := _emissive(Color(0.16, 0.10, 0.08), 0.07, "res://assets/tex/exit.png")   # v25fix : porte ETEINTE mais LISIBLE (bouche le trou etoile)
 	exit_glow_mat = eqm
-	var eq := _quad(Vector2(1.15, 2.2), eqm)
+	var eq := _quad(Vector2(1.6, 2.8), eqm)
 	eq.rotation = Vector3(PI / 2, 0, PI / 2)
-	eq.position = Vector3(0, 1.1, 0)
+	eq.position = Vector3(0, 1.4, 0)
 	exit_door.add_child(eq)
 	var el := OmniLight3D.new()
 	el.light_color = Color(1.0, 0.8, 0.5)
@@ -1899,7 +1901,7 @@ func _make_entity_kind(kind: int) -> Node3D:
 	var nd := Node3D.new()
 	# v12.2 : peau réaliste = texture cadavérique + normal map + rugosité + sous-surface (SSS)
 	var skin := StandardMaterial3D.new()
-	skin.albedo_color = Color(0.62, 0.57, 0.52)
+	skin.albedo_color = Color(0.44, 0.40, 0.36)   # v25fix : peau plus sombre (Voilee lisible mais funebre)
 	skin.albedo_texture = load("res://assets/tex/skin_albedo.png")
 	skin.normal_enabled = true
 	skin.normal_texture = load("res://assets/tex/skin_normal.png")
@@ -2224,6 +2226,25 @@ func _make_entity_kind(kind: int) -> Node3D:
 	ent_sniff.max_distance = 14.0
 	ent_sniff.position = Vector3(0, 1.9, -0.2)
 	nd.add_child(ent_sniff)
+	# v25fix : LA VOILEE par defaut = procedural — sac de jute noue sur le crane
+	var sackp := MeshInstance3D.new()
+	var skmp := SphereMesh.new()
+	skmp.radius = 0.082
+	skmp.height = 0.20
+	sackp.mesh = skmp
+	sackp.scale = Vector3(1.05, 1.45, 1.15)
+	var jmp := _simple(Color(0.42, 0.30, 0.17), 0.95)
+	jmp.normal_enabled = true
+	jmp.normal_texture = load("res://assets/tex/skin_normal.png")
+	jmp.normal_scale = 2.2
+	sackp.material_override = jmp
+	var headp := nd.get_node_or_null("Head")
+	if headp != null:
+		sackp.position = Vector3(0, 0.15, -0.01)
+		headp.add_child(sackp)
+	else:
+		sackp.position = Vector3(0, 2.30, -0.16)
+		nd.add_child(sackp)
 	nd.scale = Vector3(ENT_SCALE, ENT_SCALE, ENT_SCALE)
 	return nd
 
