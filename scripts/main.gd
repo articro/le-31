@@ -439,6 +439,51 @@ var stair2_cd := 0.0
 var stair2_dir := 1
 var attic_pl: AudioStreamPlayer = null
 var wing_pl: AudioStreamPlayer = null
+# ---- v24 : un monstre par etage + objets 3D colores ----
+var ent_kind := 0          # 0 = Voilee (rig) · 1 = Enfant de cendre (etage) · 2 = Rampant (grenier)
+var marion_root: Node3D = null
+const NEXT_PALS := {
+	"enfant": {"c_a": Color(0.42, 0.42, 0.40), "c_b": Color(0.23, 0.20, 0.17), "c_c": Color(0.50, 0.49, 0.47), "c_arms": Color(0.46, 0.45, 0.43), "t0": 0.25, "t1": 0.62, "arm_x": 0.45, "rough": 0.9, "rim": 0.15, "grain": 0.12},
+	"rampant": {"c_a": Color(0.55, 0.54, 0.52), "c_b": Color(0.50, 0.49, 0.48), "c_c": Color(0.60, 0.59, 0.57), "c_arms": Color(0.56, 0.55, 0.53), "t0": 0.35, "t1": 0.70, "arm_x": 0.40, "rough": 0.85, "rim": 0.2, "grain": 0.08},
+	"marionnette": {"c_a": Color(0.20, 0.12, 0.06), "c_b": Color(0.18, 0.11, 0.06), "c_c": Color(0.24, 0.15, 0.08), "c_arms": Color(0.21, 0.13, 0.07), "t0": 0.4, "t1": 0.8, "arm_x": 0.35, "rough": 0.5, "rim": 0.12, "grain": 0.2},
+	"poupee": {"c_a": Color(0.20, 0.28, 0.38), "c_b": Color(0.22, 0.30, 0.40), "c_c": Color(0.85, 0.82, 0.75), "c_arms": Color(0.83, 0.80, 0.73), "t0": 0.45, "t1": 0.72, "arm_x": 0.30, "rough": 0.3, "rim": 0.2, "grain": 0.06},
+	"voiture": {"c_a": Color(0.05, 0.05, 0.05), "c_b": Color(0.30, 0.06, 0.05), "c_c": Color(0.03, 0.03, 0.035), "c_arms": Color(0.30, 0.06, 0.05), "t0": 0.36, "t1": 0.60, "arm_x": 2.0, "rough": 0.6, "rim": 0.1, "grain": 0.25},
+	"armoire": {"c_a": Color(0.13, 0.08, 0.045), "c_b": Color(0.13, 0.08, 0.045), "c_c": Color(0.16, 0.10, 0.06), "c_arms": Color(0.13, 0.08, 0.045), "t0": 0.4, "t1": 0.8, "arm_x": 2.0, "rough": 0.7, "rim": 0.08, "grain": 0.18},
+	"horloge": {"c_a": Color(0.14, 0.09, 0.05), "c_b": Color(0.15, 0.09, 0.05), "c_c": Color(0.80, 0.75, 0.62), "c_arms": Color(0.15, 0.09, 0.05), "t0": 0.55, "t1": 0.75, "arm_x": 2.0, "rough": 0.6, "rim": 0.1, "grain": 0.15},
+	"boite": {"c_a": Color(0.12, 0.07, 0.04), "c_b": Color(0.45, 0.32, 0.12), "c_c": Color(0.50, 0.36, 0.14), "c_arms": Color(0.45, 0.32, 0.12), "t0": 0.45, "t1": 0.7, "arm_x": 2.0, "rough": 0.35, "rim": 0.15, "grain": 0.1},
+}
+const NEXT_SHDR := """
+shader_type spatial;
+varying vec3 v_loc;
+uniform vec4 c_a;
+uniform vec4 c_b;
+uniform vec4 c_c;
+uniform vec4 c_arms;
+uniform float t0;
+uniform float t1;
+uniform float arm_x;
+uniform float rough_v;
+uniform float rim_v;
+uniform float grain;
+void vertex() {
+	v_loc = VERTEX;
+}
+float hash(vec3 p) {
+	return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+}
+void fragment() {
+	float h = clamp((v_loc.y + 1.0) * 0.5, 0.0, 1.0);
+	vec3 col = mix(c_a.rgb, c_b.rgb, smoothstep(0.05, t0, h));
+	col = mix(col, c_c.rgb, smoothstep(t0, t1, h));
+	float ax = smoothstep(arm_x, arm_x + 0.15, abs(v_loc.x));
+	col = mix(col, c_arms.rgb, ax);
+	col *= 1.0 - grain + grain * hash(floor(v_loc * 90.0));
+	ALBEDO = col;
+	ROUGHNESS = rough_v;
+	float fr = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
+	EMISSION = col * fr * rim_v;
+}
+"""
 const RIG_MODES := {
 	0: {"lean": 0.05, "head_p": 0.10, "arm_x": -0.15, "arm_z": 0.60, "arm_fwd": -0.30, "elbow": -0.30, "sh_up": 0.05, "chest_p": 0.08, "amp": 0.45, "stride": 0.30, "jaw": 0.02},
 	1: {"lean": 0.20, "head_p": -0.05, "arm_x": -0.10, "arm_z": 0.55, "arm_fwd": -0.48, "elbow": -0.60, "sh_up": 0.10, "chest_p": 0.14, "amp": 1.00, "stride": 0.42, "jaw": 0.06},
@@ -930,6 +975,51 @@ func _ensure_door_pl() -> void:
 		add_child(door_pl)
 
 
+func _next_mat(key: String) -> ShaderMaterial:
+	# v24 : coloriage par zones (les GLB arrives sont blancs, sans materiaux)
+	var p: Dictionary = NEXT_PALS[key]
+	var m := ShaderMaterial.new()
+	m.shader = Shader.new()
+	m.shader.code = NEXT_SHDR
+	m.set_shader_parameter("c_a", p["c_a"])
+	m.set_shader_parameter("c_b", p["c_b"])
+	m.set_shader_parameter("c_c", p["c_c"])
+	m.set_shader_parameter("c_arms", p["c_arms"])
+	m.set_shader_parameter("t0", p["t0"])
+	m.set_shader_parameter("t1", p["t1"])
+	m.set_shader_parameter("arm_x", p["arm_x"])
+	m.set_shader_parameter("rough_v", p["rough"])
+	m.set_shader_parameter("rim_v", p["rim"])
+	m.set_shader_parameter("grain", p["grain"])
+	return m
+
+
+func _load_next(res: String, key: String, at: Vector3, s: float, ry := 0.0, collide := true, col_sz := Vector3.ZERO, col_at := Vector3.ZERO, attach := true) -> Node3D:
+	# v24 : modele GLB "next" colore + collision optionnelle
+	var ps: PackedScene = load(res)
+	if ps == null:
+		return null
+	var inst: Node3D = ps.instantiate()
+	inst.scale = Vector3(s, s, s)
+	inst.position = at
+	inst.rotation.y = ry
+	var m := _next_mat(key)
+	for nd in inst.find_children("*", "MeshInstance3D"):
+		(nd as MeshInstance3D).material_override = m
+	if attach:
+		world.add_child(inst)
+	if collide:
+		var col := StaticBody3D.new()
+		var bs := BoxShape3D.new()
+		bs.size = col_sz
+		var cs := CollisionShape3D.new()
+		cs.shape = bs
+		col.add_child(cs)
+		col.position = col_at if col_at != Vector3.ZERO else at + Vector3(0, col_sz.y * 0.5, 0)
+		world.add_child(col)
+	return inst
+
+
 func _try_door() -> void:
 	# v23 : R = ouvrir/fermer la porte la plus proche (grincement audible)
 	if state != "play" or hidden:
@@ -1054,10 +1144,8 @@ func _build_house() -> void:
 	_cc0("res://assets/cc0/bathtub.obj", Vector3(18.8, 0, 1.2), PI / 2, 0.134)
 	_cc0("res://assets/cc0/bathroomSink.obj", Vector3(14.0, 0, 0.5), PI, 0.152)
 	_cc0("res://assets/cc0/toilet.obj", Vector3(16.2, 0, 0.6), PI, 0.166)
-	# garage : voiture + étagère
-	_furn(Vector3(4.2, 1.1, 2.0), Vector3(4.25, 0.65, 11.6), _simple(Color(0.16, 0.035, 0.03), 0.35, 0.5))
-	_furn(Vector3(2.3, 0.65, 1.7), Vector3(4.0, 1.5, 11.6), _simple(Color(0.14, 0.03, 0.028), 0.3, 0.5))
-	_furn(Vector3(2.1, 0.5, 1.6), Vector3(4.05, 1.42, 11.6), _simple(Color(0.02, 0.02, 0.025), 0.1, 0.1))
+	# garage : voiture — v24 : vrai modele 3D colore (rouge sombre rouille)
+	_load_next("res://assets/next/voiture.glb", "voiture", Vector3(3.2, 0.82, 11.6), 2.15, PI / 2, true, Vector3(4.3, 1.5, 2.0), Vector3(3.2, 0.75, 11.6))
 	for wz in [10.3, 12.9]:
 		for wx in [2.9, 5.5]:
 			_furn(Vector3(0.7, 0.7, 0.25), Vector3(wx, 0.35, wz), _simple(Color(0.05, 0.05, 0.05), 0.8))
@@ -1333,16 +1421,10 @@ func _build_house() -> void:
 	wing_pl.volume_db = -80.0
 	wing_pl.autoplay = true
 	add_child(wing_pl)
-	# cachettes : placard ch2, alcôve garage (sous escalier = renfoncement naturel)
+	# cachettes : v24 = vraies ARMOIRES 3D (ch2 + couloir), alcôve garage gardee
 	var plankm := _pbr("wall")
 	for hp in [Vector2(15.8, 9.0), Vector2(3.0, 9.0)]:
-		for hd in [Vector3(-0.55, 0, 0), Vector3(0.55, 0, 0), Vector3(0, 0, -0.55)]:
-			var hw := _box(Vector3(0.08 if hd.x != 0 else 1.2, 2.0, 1.2 if hd.x != 0 else 0.08), plankm)
-			hw.position = Vector3(hp.x + hd.x, 1.0, hp.y + hd.z)
-			world.add_child(hw)
-		var ht := _box(Vector3(1.2, 0.08, 1.2), plankm)
-		ht.position = Vector3(hp.x, 2.0, hp.y)
-		world.add_child(ht)
+		_load_next("res://assets/next/armoire.glb", "armoire", Vector3(hp.x, 0, hp.y + 0.35), 1.1, PI, true, Vector3(1.7, 2.2, 1.15), Vector3(hp.x, 1.1, hp.y + 0.35))
 	# détails : tapis, cartons, toiles d'araignée, citrouilles
 	var rug1 := _quad(Vector2(2.6, 1.8), _simple(Color(0.22, 0.06, 0.06), 0.9))
 	rug1.rotation = Vector3(0, 0.1, 0)
@@ -1406,83 +1488,14 @@ func _build_house() -> void:
 
 func _props_v21(woodm: StandardMaterial3D) -> void:
 	# v22a : la TV procedurale a ete remplacee par televisionVintage.obj (CC0) dans le salon
-	# ============ v21 PROP 2 : poupee de porcelaine (chambre d'Elise) ============
+	# ============ v21 PROP 2 : poupee — v24 : vrai modele 3D colore ============
 	var porc := _simple(Color(0.90, 0.86, 0.82), 0.25)
-	porc.subsurf_scatter_enabled = true
-	porc.subsurf_scatter_strength = 0.25
-	var doll := Node3D.new()
-	doll.position = Vector3(14.6, 0.0, 3.9)
-	doll.rotation.y = 0.5
-	var torso := MeshInstance3D.new()
-	var tc := CylinderMesh.new()
-	tc.top_radius = 0.055; tc.bottom_radius = 0.085; tc.height = 0.20
-	torso.mesh = tc
-	torso.material_override = _simple(Color(0.45, 0.10, 0.12), 0.7)   # robe bordeaux
-	torso.position = Vector3(0, 0.10, 0)
-	doll.add_child(torso)
-	var dhead := MeshInstance3D.new()
-	var hs := SphereMesh.new()
-	hs.radius = 0.075
-	dhead.mesh = hs
-	dhead.material_override = porc
-	dhead.position = Vector3(0, 0.26, 0)
-	dhead.rotation.z = 0.18   # tete penchee, malaise garanti
-	doll.add_child(dhead)
-	doll_head = dhead   # v22d : elle tournera vers ELLE
-	doll_root = doll
-	for ex in [-1, 1]:
-		var eye := MeshInstance3D.new()
-		var es := SphereMesh.new()
-		es.radius = 0.013
-		eye.mesh = es
-		eye.material_override = _simple(Color(0.02, 0.02, 0.02), 0.15)
-		eye.position = Vector3(ex * 0.030, 0.27, -0.062)
-		dhead.add_child(eye)
-	var hair := MeshInstance3D.new()
-	var hc := SphereMesh.new()
-	hc.radius = 0.079
-	hair.mesh = hc
-	hair.material_override = _simple(Color(0.15, 0.09, 0.05), 0.8)
-	hair.position = Vector3(0, 0.02, 0.02)
-	hair.scale = Vector3(1.0, 0.8, 1.0)
-	dhead.add_child(hair)
-	world.add_child(doll)
+	doll_root = _load_next("res://assets/next/poupee.glb", "poupee", Vector3(14.6, 0.0, 3.9), 0.25, 0.5, false)
+	doll_head = null
 	_furn(Vector3(0.20, 0.34, 0.20), Vector3(14.6, 0.17, 3.9), porc)
-	# ============ v21 PROP 3 : horloge a balancier (couloir, mur nord) ============
+	# ============ v21 PROP 3 : horloge — v24 : vrai modele 3D colore (le tic-tac reste) ============
 	var woodd := _simple(Color(0.16, 0.10, 0.06), 0.6)
-	var clk := Node3D.new()
-	clk.position = Vector3(7.0, 0.0, 0.30)
-	var cas := _box(Vector3(0.5, 2.0, 0.28), woodd)
-	cas.position = Vector3(0, 1.0, 0)
-	clk.add_child(cas)
-	var dial := _quad(Vector2(0.34, 0.34), _emissive(Color(0.95, 0.88, 0.70), 0.5, ""))
-	dial.position = Vector3(0, 1.62, 0.145)
-	clk.add_child(dial)
-	for ha in [0, PI / 2]:
-		var hand := _quad(Vector2(0.02, 0.13), _simple(Color(0.05, 0.05, 0.05), 0.5))
-		hand.position = Vector3(0, 1.62, 0.15)
-		hand.rotation.z = ha + 0.6
-		clk.add_child(hand)
-	var win := _quad(Vector2(0.28, 0.9), _simple(Color(0.03, 0.02, 0.015), 0.3))
-	win.position = Vector3(0, 0.95, 0.145)
-	clk.add_child(win)
-	var brass := _simple(Color(0.65, 0.45, 0.15), 0.3, 1.0)
-	clock_pend = Node3D.new()
-	clock_pend.position = Vector3(0, 1.35, 0.10)
-	var rod := _box(Vector3(0.02, 0.7, 0.02), brass)
-	rod.position = Vector3(0, -0.35, 0)
-	clock_pend.add_child(rod)
-	var disc := MeshInstance3D.new()
-	var dc := CylinderMesh.new()
-	dc.top_radius = 0.09; dc.bottom_radius = 0.09; dc.height = 0.015
-	disc.mesh = dc
-	disc.material_override = brass
-	disc.rotation.x = PI / 2
-	disc.position = Vector3(0, -0.72, 0)
-	clock_pend.add_child(disc)
-	clk.add_child(clock_pend)
-	world.add_child(clk)
-	_furn(Vector3(0.5, 2.0, 0.28), Vector3(7.0, 1.0, 0.30), woodd)
+	_load_next("res://assets/next/horloge.glb", "horloge", Vector3(7.0, 0.0, 0.32), 1.05, 0.0, true, Vector3(0.62, 2.1, 0.36), Vector3(7.0, 1.05, 0.32))
 	clock_pl = AudioStreamPlayer3D.new()
 	clock_pl.stream = load("res://assets/audio/tick.wav")
 	clock_pl.volume_db = -18.0
@@ -1516,6 +1529,10 @@ func _props_v21(woodm: StandardMaterial3D) -> void:
 	music_box_pl.stream = load("res://assets/audio/music_box.wav")
 	music_box_pl.volume_db = -24.0
 	add_child(music_box_pl)
+	# v24 : la boite a musique 3D, posee sur la table basse du salon
+	_load_next("res://assets/next/boite_musique.glb", "boite", Vector3(3.2, 0.32, 3.4), 0.16, 0.8, false)
+	# v24 : la Marionnette en reserve — debout dans la bibliotheque, elle te suit du regard
+	marion_root = _load_next("res://assets/next/monstre_marionnette.glb", "marionnette", Vector3(21.2, 0, 1.4), 1.3, 2.6, true, Vector3(0.5, 2.3, 0.45), Vector3(21.2, 1.15, 1.4))
 
 
 func _make_poster_xy(at: Vector2, ry: float) -> Node3D:
@@ -1768,8 +1785,27 @@ func _build_entity_rig() -> Node3D:
 			m.rim_enabled = true
 			m.rim = 0.42
 			m.rim_tint = 0.5
+			# v24 : LA VOILEE — robe de deuil noire (le sac de jute couvre la tete)
+			m.albedo_color = Color(0.06, 0.055, 0.06)
 			mi.material_override = m
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	# v24 : sac de jute couse sur le crane, suit l'os head (BoneAttachment)
+	var ba := BoneAttachment3D.new()
+	ba.bone_name = "head"
+	sk.add_child(ba)
+	var sack := MeshInstance3D.new()
+	var skm := SphereMesh.new()
+	skm.radius = 0.082
+	skm.height = 0.20
+	sack.mesh = skm
+	sack.scale = Vector3(1.05, 1.45, 1.15)
+	sack.position = Vector3(0, 0.07, 0.01)
+	var jm := _simple(Color(0.42, 0.30, 0.17), 0.95)
+	jm.normal_enabled = true
+	jm.normal_texture = load("res://assets/tex/skin_normal.png")
+	jm.normal_scale = 2.2
+	sack.material_override = jm
+	ba.add_child(sack)
 	inst.scale = Vector3(rig_scale, rig_scale, rig_scale)
 	var aura := OmniLight3D.new()
 	aura.light_color = Color(0.72, 0.68, 0.62)
@@ -1793,7 +1829,25 @@ func _rig_tri_count(mi: MeshInstance3D) -> int:
 
 
 func _make_entity() -> Node3D:
-	# v19 : la creature skinee d'abord (vraie peau continue, vraie demarche)
+	return _make_entity_kind(ent_kind)
+
+
+func _make_entity_kind(kind: int) -> Node3D:
+	# v24 : un monstre par etage — 0 = Voilee (rig anime) · 1 = Enfant de cendre · 2 = Rampant
+	if kind == 1 and ResourceLoader.exists("res://assets/next/enfant_cendre.glb"):
+		var e1 := _load_next("res://assets/next/enfant_cendre.glb", "enfant", Vector3.ZERO, 0.55, 0.0, false, Vector3.ZERO, Vector3.ZERO, false)
+		if e1 != null:
+			_ent_audio_attach(e1)
+			if dbg != "":
+				print("DBG entity=ENFANT CENDRE")
+			return e1
+	if kind == 2 and ResourceLoader.exists("res://assets/next/monstre_rempant.glb"):
+		var e2 := _load_next("res://assets/next/monstre_rempant.glb", "rampant", Vector3.ZERO, 1.14, 0.0, false, Vector3.ZERO, Vector3.ZERO, false)
+		if e2 != null:
+			_ent_audio_attach(e2)
+			if dbg != "":
+				print("DBG entity=RAMPANT")
+			return e2
 	if rig_enabled and dbg != "nomodel" and dbg != "model1" and dbg != "old" and ResourceLoader.exists("res://assets/models/monstre_rig.glb"):
 		var mr := _build_entity_rig()
 		if mr != null:
@@ -4083,14 +4137,30 @@ func _process(d: float) -> void:
 		var wx := clampf(1.0 - absf(player.position.x - 25.0) / 8.0, 0.0, 1.0)
 		var want_w := (-80.0 + wx * 62.0) if player_level == 0 else -80.0
 		wing_pl.volume_db = lerpf(wing_pl.volume_db, want_w, minf(1.0, 2.0 * d))
-	# v22d : la poupee tourne lentement la tete vers ELLE (< 10 m) — indicateur diegetique
-	if doll_head != null and is_instance_valid(doll_head) and doll_root != null and is_instance_valid(doll_root):
-		var want := 0.0
+	# v24 : postures des chasseurs — Rampant a quatre pattes, Enfant voute
+	if entity != null and is_instance_valid(entity):
+		if ent_kind == 2:
+			entity.rotation.x = -1.25 + sin(run_time * 9.0) * (0.07 if entity_mode == 2 else 0.03)
+			entity.rotation.z = sin(run_time * 4.5) * 0.05
+		elif ent_kind == 1:
+			entity.rotation.x = 0.22 + sin(run_time * 7.0) * 0.02
+			entity.rotation.z = sin(run_time * 3.1) * 0.06
+		elif entity.rotation.x != 0.0 or entity.rotation.z != 0.0:
+			entity.rotation.x = 0.0
+			entity.rotation.z = 0.0
+	# v24 : la poupee 3D tourne lentement vers ELLE (< 10 m) — indicateur diegetique
+	if doll_root != null and is_instance_valid(doll_root):
+		var want := 0.5
 		if entity != null and is_instance_valid(entity) and entity.visible:
-			var dd := entity.global_position - doll_head.global_position
+			var dd := entity.global_position - doll_root.global_position
 			if Vector2(dd.x, dd.z).length() < 10.0:
-				want = clampf(wrapf(atan2(-dd.x, -dd.z) - doll_root.rotation.y, -PI, PI), -1.1, 1.1)
-		doll_head.rotation.y = lerpf(doll_head.rotation.y, want, minf(1.0, 1.5 * d))
+				want = atan2(-dd.x, -dd.z)
+		doll_root.rotation.y = lerpf(doll_root.rotation.y, want, minf(1.0, 1.2 * d))
+	# v24 : la Marionnette (reserve, bibliotheque) se tourne vers toi si tu t'approches
+	if marion_root != null and is_instance_valid(marion_root):
+		var md := player.position - marion_root.position
+		if Vector2(md.x, md.z).length() < 4.5 and state == "play":
+			marion_root.rotation.y = lerpf(marion_root.rotation.y, atan2(-md.x, -md.z), minf(1.0, 0.7 * d))
 	# v22d : boite a musique pendant la dormance ; silence = elle est reveillee
 	if music_box_pl != null and is_instance_valid(music_box_pl):
 		var dor := _ent_asleep()
@@ -4233,6 +4303,24 @@ func _process(d: float) -> void:
 	pocket_lbl.text = tt("pocket") % pocket + ("  ·  " + tt("key_e_s") if has_key_exit else "") + ("  ·  " + tt("key_c_s") if has_key_ch1 else "")
 	if entity == null or not is_instance_valid(entity):
 		_spawn_chaser()
+	# v24 : UN MONSTRE PAR ETAGE — le chasseur change avec ton niveau
+	var want_kind := clampi(player_level, 0, 2)
+	if want_kind != ent_kind and state == "play":
+		var oldp := entity.position
+		var oldr := entity.rotation.y
+		ent_kind = want_kind
+		var old := entity
+		entity = _make_entity()
+		world.add_child(entity)
+		entity.position = oldp
+		entity.rotation.y = oldr
+		if is_instance_valid(old):
+			old.queue_free()
+		play("sting", -7.0)
+		play("growl", -10.0, 1.2)
+		_toast(["", "QUELQUE CHOSE D'AUTRE VIT À L'ÉTAGE…", "LE GRENIER N'EST PAS VIDE…"][want_kind], 3.0)
+		if dbg != "":
+			print("DBG swap hunter kind=%d lvl=%d" % [want_kind, player_level])
 	var epos2 := Vector2(entity.position.x, entity.position.z)
 	var dist: float = (epos2 - p2z).length()
 	ent_glued = false
