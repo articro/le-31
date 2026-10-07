@@ -505,6 +505,7 @@ var doll_head: Node3D = null
 var doll_root: Node3D = null
 var veil_sack: MeshInstance3D = null
 var veil_skel: Skeleton3D = null
+var menu_mobs: Array = []   # v25 : les 4 monstres du menu, flicker + yeux + ils rampent vers toi
 var music_box_pl: AudioStreamPlayer = null
 var absence_t := 0.0
 var creek_sfx_t := 6.0
@@ -3022,7 +3023,7 @@ func _build_ui() -> void:
 	title_ctl.add_child(sb)
 	var vtag := Label.new()
 	vtag.name = "Ver"
-	vtag.text = "v20b MACHOIRE"
+	vtag.text = "v25 RÉPARATIONS"
 	vtag.position = Vector2(1180, 690)
 	vtag.size = Vector2(180, 24)
 	vtag.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -3538,6 +3539,11 @@ func _begin_run() -> void:
 		_decor_rich()
 	if menu_ent != null and is_instance_valid(menu_ent):
 		menu_ent.visible = false
+	# v25 : les monstres du menu restent au menu
+	for mo in menu_mobs:
+		if is_instance_valid(mo["nd"]):
+			mo["nd"].queue_free()
+	menu_mobs.clear()
 	_spawn_chaser()
 	poster_base = ["poster_a", "poster_c"][rng.randi_range(0, 1)]
 	candy_offer = []
@@ -3902,8 +3908,60 @@ func _menu_ent_ensure() -> Node3D:
 	return menu_ent
 
 
+func _menu_mobs_ensure() -> void:
+	# v25 : TOUS les monstres en arriere-plan du menu — flicker, yeux lumineux, ils se rapprochent
+	if menu_mobs.size() > 0:
+		return
+	var defs := [
+		["enfant", "res://assets/next/enfant_cendre.glb", Vector3(7.0, 0, 7.5), 0.55, 0.0, 0.15, Color(0.85, 0.95, 1.0)],
+		["rampant", "res://assets/next/monstre_rempant.glb", Vector3(12.0, 0, 6.1), 1.14, -PI / 2, -1.25, Color(0.9, 0.96, 0.9)],
+		["marionnette", "res://assets/next/monstre_marionnette.glb", Vector3(4.5, 0, 7.7), 1.3, -0.35, 0.0, Color(1.0, 0.55, 0.15)],
+	]
+	for df in defs:
+		var nd := _load_next(df[1], df[0], df[2], df[3], df[4], false, Vector3.ZERO, Vector3.ZERO, false)
+		if nd == null:
+			continue
+		nd.rotation.x = df[5]
+		world.add_child(nd)
+		for ex in [-1, 1]:
+			var e := MeshInstance3D.new()
+			var es2 := SphereMesh.new()
+			es2.radius = 0.028 * df[3]
+			e.mesh = es2
+			e.material_override = _emissive(df[6], 2.2, "")
+			e.position = Vector3(ex * 0.055 * df[3], 0.80 * df[3], -0.075 * df[3])
+			nd.add_child(e)
+		menu_mobs.append({"nd": nd, "t": randf_range(0.8, 2.5), "vis": true, "base": df[2]})
+
+
+func _menu_mobs_update(d: float) -> void:
+	var cp := cam.global_position
+	for mo in menu_mobs:
+		mo["t"] = float(mo["t"]) - d
+		if float(mo["t"]) <= 0.0:
+			var nd: Node3D = mo["nd"]
+			if mo["vis"]:
+				nd.visible = false
+				mo["vis"] = false
+				mo["t"] = randf_range(0.4, 1.6)
+			else:
+				nd.visible = true
+				mo["vis"] = true
+				mo["t"] = randf_range(1.2, 3.5)
+				if randf() < 0.6:
+					var to2 := cp - nd.position
+					to2.y = 0.0
+					if to2.length() > 3.2:
+						nd.position += to2.normalized() * 0.4
+						nd.rotation.y = atan2(-to2.x, -to2.z)
+				elif randf() < 0.3:
+					nd.position = mo["base"]
+
+
 func _title_update(d: float) -> void:
 	title_cam_t += d * 0.5
+	_menu_mobs_ensure()
+	_menu_mobs_update(d)
 	var me := _menu_ent_ensure()
 	if me != null:
 		me.visible = true
