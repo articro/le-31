@@ -1047,7 +1047,9 @@ func _build_house() -> void:
 	_cc0("res://assets/cc0/kitchenSink.obj", Vector3(8.2, 0, 0.5), PI, 0.209)
 	_cc0("res://assets/cc0/kitchenStove.obj", Vector3(12.2, 0, 0.5), PI, 0.163)
 	_cc0("res://assets/cc0/kitchenFridge.obj", Vector3(14.0, 0, 0.5), PI, 0.185)
-	_furn(Vector3(1.6, 0.75, 1.0), Vector3(9.5, 0.38, 3.5), woodm)   # table cuisine (gardee)
+	_cc0("res://assets/cc0/table.obj", Vector3(9.5, 0, 3.5), 0.0, 0.17)   # table cuisine + chaises
+	_cc0("res://assets/cc0/chairRounded.obj", Vector3(9.5, 0, 2.7), PI, 0.16)
+	_cc0("res://assets/cc0/chairRounded.obj", Vector3(9.5, 0, 4.3), 0.0, 0.16)
 	# salle de bains — v22a : vrais sanitaires CC0
 	_cc0("res://assets/cc0/bathtub.obj", Vector3(18.8, 0, 1.2), PI / 2, 0.134)
 	_cc0("res://assets/cc0/bathroomSink.obj", Vector3(14.0, 0, 0.5), PI, 0.152)
@@ -1059,7 +1061,8 @@ func _build_house() -> void:
 	for wz in [10.3, 12.9]:
 		for wx in [2.9, 5.5]:
 			_furn(Vector3(0.7, 0.7, 0.25), Vector3(wx, 0.35, wz), _simple(Color(0.05, 0.05, 0.05), 0.8))
-	_furn(Vector3(0.5, 2.0, 3.4), Vector3(6.0, 1.0, 11.5), woodm)
+	_cc0("res://assets/cc0/bookcaseOpen.obj", Vector3(6.0, 0, 10.9), PI / 2, 0.2)   # etageres garage
+	_cc0("res://assets/cc0/bookcaseOpen.obj", Vector3(6.0, 0, 12.5), PI / 2, 0.2)
 	# ================= v23 : AILE EST — la maison s'agrandit (tres grande maison) =================
 	_room_floor(20, 0, 30, 5.0, fw)
 	_room_floor(20, 5.0, 30, 9.0, fw)
@@ -1280,13 +1283,13 @@ func _build_house() -> void:
 	var uht := _box(Vector3(1.2, 0.08, 1.2), _pbr("wall"))
 	uht.position = Vector3(18.8, 4.98, 2.2)
 	world.add_child(uht)
-	# chambre 1
-	_furn(Vector3(2.0, 0.6, 1.6), Vector3(12.5, 0.3, 12.6), cloth)
-	_furn(Vector3(0.6, 2.0, 1.2), Vector3(10.5, 1.0, 10.0), woodm)
-	_furn(Vector3(0.5, 0.55, 0.5), Vector3(14.2, 0.28, 13.4), woodm)
+	# chambre 1 — v23b : vrais meubles CC0 (fini les cubes)
+	_cc0("res://assets/cc0/bedDouble.obj", Vector3(12.5, 0, 12.7), PI / 2, 0.17)
+	_cc0("res://assets/cc0/cabinetBedDrawer.obj", Vector3(10.6, 0, 10.0), -PI / 2, 0.16)
+	_cc0("res://assets/cc0/sideTableDrawers.obj", Vector3(14.2, 0, 13.4), PI, 0.12)
 	# chambre 2
-	_furn(Vector3(2.0, 0.6, 1.6), Vector3(17.5, 0.3, 12.6), cloth)
-	_furn(Vector3(1.2, 0.75, 0.6), Vector3(19.2, 0.38, 9.3), woodm)
+	_cc0("res://assets/cc0/bedDouble.obj", Vector3(17.5, 0, 12.7), PI / 2, 0.17)
+	_cc0("res://assets/cc0/sideTableDrawers.obj", Vector3(19.2, 0, 9.3), -PI / 2, 0.14)
 	# lampes
 	var lit_ids := [1, 4, 7]
 	var li2 := 0
