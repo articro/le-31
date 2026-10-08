@@ -1,5 +1,7 @@
 # Cache d'import Godot (regenerable en ~45 s par --import) : jamais committe
 .godot/
+# Python (outils)
+__pycache__/
 # Divers
 *.tmp
 *.log

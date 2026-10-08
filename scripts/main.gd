@@ -409,8 +409,8 @@ void fragment() {
 var ent_model_kind := 2        # 2 = v17 (10 parties) · 1 = v15 (6) · 0 = v13 (4)
 # ---- v19 : creature skinee (monstre_rig.glb, 21 os, peau continue) ----
 var rig_enabled := false  # v25fix : le rig skinne rendait « araignee piquante » en jeu — PAR DEFAUT procedural (sur) ; F3 = bascule rig
-var rig_state := {}            # instance_id -> {skel, mesh, gait, can, fil}
-var rig_scale := 2.20   # v21c : rig skinne (option F3) aligne sur 2,20 m
+var rig_state := {}            # instance_id -> {skel, mesh, gait, can, fil, M, sole, modes, crawl}
+var rig_scale := 2.00   # v27fix : rig skinne aligne sur 2,00 m (avant 2,20 = trop grand)
 var rig_y_hip := 0.4154
 var rig_y_ank := 0.0904
 var rig_l_thigh := 0.1838
@@ -465,6 +465,8 @@ uniform float arm_x;
 uniform float rough_v;
 uniform float rim_v;
 uniform float grain;
+uniform float h_lo = -1.0;
+uniform float h_hi = 1.0;
 void vertex() {
 	v_loc = VERTEX;
 }
@@ -472,7 +474,7 @@ float hash(vec3 p) {
 	return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
 }
 void fragment() {
-	float h = clamp((v_loc.y + 1.0) * 0.5, 0.0, 1.0);
+	float h = clamp((v_loc.y - h_lo) / (h_hi - h_lo), 0.0, 1.0);
 	vec3 col = mix(c_a.rgb, c_b.rgb, smoothstep(0.05, t0, h));
 	col = mix(col, c_c.rgb, smoothstep(t0, t1, h));
 	float ax = smoothstep(arm_x, arm_x + 0.15, abs(v_loc.x));
@@ -492,7 +494,7 @@ const RIG_MODES := {
 	4: {"lean": 0.60, "head_p": 0.12, "arm_x": 0.35, "arm_z": 0.50, "arm_fwd": -1.30, "elbow": -0.50, "sh_up": 0.40, "chest_p": 0.30, "amp": 0.80, "stride": 0.34, "jaw": 0.26},
 }
 var rig_dbg := false
-const ENT_SCALE := 0.936       # v21c : 2,20 m (lisible sous plafond 2,82, passe les portes visuellement)
+const ENT_SCALE := 0.85        # v27fix : ~2,00 m (avant 0.936 = ~2,15 m, trop grand selon l'utilisateur)
 var ent_prev_phase := 0.0
 var ent_anim_dbg := 0
 var ent_step: AudioStreamPlayer3D = null
@@ -980,8 +982,9 @@ func _ensure_door_pl() -> void:
 		add_child(door_pl)
 
 
-func _next_mat(key: String) -> ShaderMaterial:
+func _next_mat(key: String, y_lo := -1.0, y_hi := 1.0) -> ShaderMaterial:
 	# v24 : coloriage par zones (les GLB arrives sont blancs, sans materiaux)
+	# v27fix : y_lo/y_hi = bornes verticales du maillage (rigs normalises 0..1, GLB bruts -1..1)
 	var p: Dictionary = NEXT_PALS[key]
 	var m := ShaderMaterial.new()
 	m.shader = Shader.new()
@@ -996,13 +999,37 @@ func _next_mat(key: String) -> ShaderMaterial:
 	m.set_shader_parameter("rough_v", p["rough"])
 	m.set_shader_parameter("rim_v", p["rim"])
 	m.set_shader_parameter("grain", p["grain"])
+	m.set_shader_parameter("h_lo", y_lo)
+	m.set_shader_parameter("h_hi", y_hi)
 	return m
+
+
+func _all_meshes(root: Node) -> Array:
+	# v27fix : inclut la RACINE si c'est un MeshInstance3D — les GLB a un seul objet ont le
+	# MeshInstance3D en racine ; find_children ne retourne que les ENFANTS (bug des monstres blancs)
+	var out: Array = []
+	if root is MeshInstance3D:
+		out.append(root)
+	for nd in root.find_children("*", "MeshInstance3D", true, false):
+		out.append(nd)
+	return out
+
+
+func _rel_xform(mi: Node3D, root: Node3D) -> Transform3D:
+	# transform de mi exprime dans le repere de root
+	var t := Transform3D.IDENTITY
+	var n: Node = mi
+	while n != null and n != root:
+		if n is Node3D:
+			t = (n as Node3D).transform * t
+		n = n.get_parent()
+	return t
 
 
 func _renorm(inst: Node3D) -> void:
 	# v25 : les GLB des sites arrivent SANS NORMALES -> rendu noir/piquant.
 	# On recalcule normales + tangentes surface par surface.
-	for mi in inst.find_children("*", "MeshInstance3D"):
+	for mi in _all_meshes(inst):
 		var m3 := mi as MeshInstance3D
 		var old: Mesh = m3.mesh
 		if old == null or old.get_surface_count() == 0:
@@ -1017,21 +1044,41 @@ func _renorm(inst: Node3D) -> void:
 		m3.mesh = nm
 
 
-func _load_next(res: String, key: String, at: Vector3, s: float, ry := 0.0, collide := true, col_sz := Vector3.ZERO, col_at := Vector3.ZERO, attach := true) -> Node3D:
+func _load_next(res: String, key: String, at: Vector3, s: float, ry := 0.0, collide := true, col_sz := Vector3.ZERO, col_at := Vector3.ZERO, attach := true, flip_face := false, foot_align := false) -> Node3D:
 	# v24 : modele GLB "next" colore + collision optionnelle
+	# v27fix : flip_face = les GLB "next" regardent +Z, le jeu utilise -Z (convention Godot)
+	#          foot_align = recaler les pieds a y=0 (origine des GLB au centre du corps)
 	var ps: PackedScene = load(res)
 	if ps == null:
 		return null
+	var root := Node3D.new()
+	root.name = "Next_" + key
 	var inst: Node3D = ps.instantiate()
-	inst.scale = Vector3(s, s, s)
-	inst.position = at
-	inst.rotation.y = ry
+	var visual := Node3D.new()
+	visual.name = "Vis"
+	visual.add_child(inst)
+	if flip_face:
+		visual.rotation.y = PI
+	if foot_align:
+		var mn := 1e9
+		for mi in _all_meshes(inst):
+			var m3 := mi as MeshInstance3D
+			if m3.mesh == null:
+				continue
+			var ab: AABB = _rel_xform(m3, inst) * m3.mesh.get_aabb()
+			mn = minf(mn, ab.position.y)
+		if mn < 1e8:
+			visual.position.y = -mn
+	root.add_child(visual)
+	root.scale = Vector3(s, s, s)
+	root.position = at
+	root.rotation.y = ry
 	_renorm(inst)
 	var m := _next_mat(key)
-	for nd in inst.find_children("*", "MeshInstance3D"):
+	for nd in _all_meshes(inst):
 		(nd as MeshInstance3D).material_override = m
 	if attach:
-		world.add_child(inst)
+		world.add_child(root)
 	if collide:
 		var col := StaticBody3D.new()
 		var bs := BoxShape3D.new()
@@ -1041,7 +1088,7 @@ func _load_next(res: String, key: String, at: Vector3, s: float, ry := 0.0, coll
 		col.add_child(cs)
 		col.position = col_at if col_at != Vector3.ZERO else at + Vector3(0, col_sz.y * 0.5, 0)
 		world.add_child(col)
-	return inst
+	return root
 
 
 func _try_door() -> void:
@@ -1563,7 +1610,8 @@ func _props_v21(woodm: StandardMaterial3D) -> void:
 	# v24 : la boite a musique 3D, posee sur la table basse du salon
 	_load_next("res://assets/next/boite_musique.glb", "boite", Vector3(3.2, 0.32, 3.4), 0.16, 0.8, false)
 	# v24 : la Marionnette en reserve — debout dans la bibliotheque, elle te suit du regard
-	marion_root = _load_next("res://assets/next/monstre_marionnette.glb", "marionnette", Vector3(21.2, 0, 1.4), 1.3, 2.6, true, Vector3(0.5, 2.3, 0.45), Vector3(21.2, 1.15, 1.4))
+	# v27fix : face -Z (elle te regarde vraiment), pieds au sol, taille 1,85 m (avant 2,30 m)
+	marion_root = _load_next("res://assets/next/monstre_marionnette.glb", "marionnette", Vector3(21.2, 0, 1.4), 1.05, 2.6, true, Vector3(0.5, 2.0, 0.45), Vector3(21.2, 1.0, 1.4), true, true, true)
 
 
 func _make_poster_xy(at: Vector2, ry: float) -> Node3D:
@@ -1712,8 +1760,9 @@ func _rig_sag(a: Vector3, b: Vector3) -> float:
 	return atan2(-(b.z - a.z), a.y - b.y)
 
 
-func _rig_prepare(sk: Skeleton3D) -> void:
+func _rig_prepare(sk: Skeleton3D, st: Dictionary = {}) -> void:
 	# reperes mesures sur le squelette lui-meme (aucune valeur devinee)
+	# v27fix : les mesures sont stockees PAR INSTANCE (st["M"]) — plusieurs creatures coexistent
 	var iT := sk.find_bone("thighL")
 	var iS := sk.find_bone("shinL")
 	var iF := sk.find_bone("footL")
@@ -1724,34 +1773,52 @@ func _rig_prepare(sk: Skeleton3D) -> void:
 	var pS := sk.get_bone_global_rest(iS).origin
 	var pF := sk.get_bone_global_rest(iF).origin
 	var pTo := sk.get_bone_global_rest(iTo).origin
-	rig_y_hip = pT.y
-	rig_y_ank = pF.y
-	rig_l_thigh = (pS - pT).length()
-	rig_l_shin = (pF - pS).length()
-	rig_chain = 0.985 * (rig_l_thigh + rig_l_shin)
-	rig_b_thigh = _rig_sag(pT, pS)
-	rig_b_shin = _rig_sag(pS, pF)
-	rig_b_foot = _rig_sag(pF, pTo)
-	# semelle : enveloppe convexe (y, z) des points de contact, lue depuis le fichier genere
-	if rig_sole.is_empty():
-		var f := FileAccess.open("res://assets/models/monstre_sole.json", FileAccess.READ)
-		if f != null:
-			var j = JSON.parse_string(f.get_as_text())
-			if j is Dictionary and j.has("footL"):
-				for p in j["footL"]["hull"]:
-					rig_sole.append(Vector3(float(p[0]), float(p[1]), float(p[2])))
-		if rig_sole.is_empty():
-			rig_sole = [Vector3(0.02, -0.088, -0.12), Vector3(0.02, -0.088, 0.024), Vector3(-0.02, -0.02, 0.024)]
-		rig_sole_k0 = _rig_sole_low(0.0)
+	# semelle : enveloppe convexe des points de contact, lue depuis le fichier genere
+	var sole: Array = []
+	var sole_path: String = str(st.get("sole_path", "res://assets/models/monstre_sole.json"))
+	var f := FileAccess.open(sole_path, FileAccess.READ)
+	if f != null:
+		var j = JSON.parse_string(f.get_as_text())
+		if j is Dictionary and j.has("footL"):
+			for p in j["footL"]["hull"]:
+				sole.append(Vector3(float(p[0]), float(p[1]), float(p[2])))
+	if sole.is_empty():
+		sole = [Vector3(0.02, -0.088, -0.12), Vector3(0.02, -0.088, 0.024), Vector3(-0.02, -0.02, 0.024)]
+	var M := {
+		"y_hip": pT.y,
+		"y_ank": pF.y,
+		"l_thigh": (pS - pT).length(),
+		"l_shin": (pF - pS).length(),
+		"b_thigh": _rig_sag(pT, pS),
+		"b_shin": _rig_sag(pS, pF),
+		"b_foot": _rig_sag(pF, pTo),
+		"sole": sole,
+		"scale": float(st.get("scale", rig_scale)),
+	}
+	M["chain"] = 0.985 * (float(M["l_thigh"]) + float(M["l_shin"]))
+	M["sole_k0"] = _rig_sole_low(0.0, sole)
+	if not st.is_empty():
+		st["M"] = M
+	# compat : les outils de debug lisent encore les globales (derniere creature preparee)
+	rig_y_hip = M["y_hip"]
+	rig_y_ank = M["y_ank"]
+	rig_l_thigh = M["l_thigh"]
+	rig_l_shin = M["l_shin"]
+	rig_chain = M["chain"]
+	rig_b_thigh = M["b_thigh"]
+	rig_b_shin = M["b_shin"]
+	rig_b_foot = M["b_foot"]
+	rig_sole = sole
+	rig_sole_k0 = M["sole_k0"]
 	if dbg != "":
 		print("DBG rig : hanche=%.4f cheville=%.4f cuisse=%.4f tibia=%.4f chaine=%.4f repos(%.3f %.3f %.3f) semelle=%d pts k0=%.4f"
-			% [rig_y_hip, rig_y_ank, rig_l_thigh, rig_l_shin, rig_chain, rig_b_thigh, rig_b_shin, rig_b_foot, rig_sole.size(), rig_sole_k0])
+			% [M["y_hip"], M["y_ank"], M["l_thigh"], M["l_shin"], M["chain"], M["b_thigh"], M["b_shin"], M["b_foot"], sole.size(), M["sole_k0"]])
 
 
-func _rig_sole_low(theta: float) -> float:
+func _rig_sole_low(theta: float, sole: Array) -> float:
 	# ordonnee du point de semelle le plus bas apres une rotation de tangage theta (autour de X)
 	var lo := 999.0
-	for p in rig_sole:
+	for p in sole:
 		lo = minf(lo, p.y * cos(theta) - p.z * sin(theta))
 	return lo
 
@@ -1788,9 +1855,9 @@ func _ent_audio_attach(nd: Node3D) -> void:
 	nd.add_child(ent_step)
 
 
-func _build_entity_rig() -> Node3D:
-	# v19 : la creature skinee — un seul maillage, un squelette de 21 os
-	var ps: PackedScene = load("res://assets/models/monstre_rig.glb")
+func _build_entity_creature(glb: String, sole_path: String, scl: float, pal_key: String, veil_style := false, crawl := false) -> Node3D:
+	# v27 : constructeur generique de creature skinnee (meme noms d'os = meme animation partagee)
+	var ps: PackedScene = load(glb)
 	if ps == null:
 		return null
 	var inst: Node3D = ps.instantiate()
@@ -1801,52 +1868,62 @@ func _build_entity_rig() -> Node3D:
 		inst.queue_free()
 		return null
 	inst.name = "EntityRig"
-	rig_state[inst.get_instance_id()] = {"skel": sk, "mesh": _rig_find_mesh(inst), "gait": 0.0, "can": {}, "fil": {}, "step": 0.0}
-	_rig_prepare(sk)
-	# peau : sous-surface + lisere lumineux -> elle se detache de l'obscurite (horreur lisible)
+	var st := {"skel": sk, "mesh": _rig_find_mesh(inst), "gait": 0.0, "can": {}, "fil": {}, "step": 0.0,
+		"sole_path": sole_path, "scale": scl, "crawl": crawl, "modes": RIG_MODES}
+	rig_state[inst.get_instance_id()] = st
+	_rig_prepare(sk, st)
 	var mi := _rig_find_mesh(inst)
 	if mi != null:
-		var src := mi.get_active_material(0)
-		if src is StandardMaterial3D:
-			var m: StandardMaterial3D = (src as StandardMaterial3D).duplicate()
-			m.roughness = 0.62
-			m.metallic = 0.0
-			m.subsurf_scatter_enabled = true
-			m.subsurf_scatter_strength = 0.16
-			m.rim_enabled = true
-			m.rim = 0.42
-			m.rim_tint = 0.5
+		if veil_style:
 			# v24 : LA VOILEE — robe de deuil sombre mais LISIBLE (v25 : plus de noir pur)
-			m.albedo_color = Color(0.13, 0.12, 0.13)
-			m.rim = 0.25
-			mi.material_override = m
+			var src := mi.get_active_material(0)
+			if src is StandardMaterial3D:
+				var m: StandardMaterial3D = (src as StandardMaterial3D).duplicate()
+				m.roughness = 0.62
+				m.metallic = 0.0
+				m.subsurf_scatter_enabled = true
+				m.subsurf_scatter_strength = 0.16
+				m.rim_enabled = true
+				m.rim = 0.25
+				m.rim_tint = 0.5
+				m.albedo_color = Color(0.13, 0.12, 0.13)
+				mi.material_override = m
+		else:
+			mi.material_override = _next_mat(pal_key, 0.0, 1.0)
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-	# v25 : sac de jute = suivi de l'os head par frame (BoneAttachment se placait au torse)
-	veil_skel = sk
-	var sack := MeshInstance3D.new()
-	var skm := SphereMesh.new()
-	skm.radius = 0.082
-	skm.height = 0.20
-	sack.mesh = skm
-	sack.scale = Vector3(1.05, 1.45, 1.15)
-	var jm := _simple(Color(0.42, 0.30, 0.17), 0.95)
-	jm.normal_enabled = true
-	jm.normal_texture = load("res://assets/tex/skin_normal.png")
-	jm.normal_scale = 2.2
-	sack.material_override = jm
-	inst.add_child(sack)
-	veil_sack = sack
-	inst.scale = Vector3(rig_scale, rig_scale, rig_scale)
-	var aura := OmniLight3D.new()
-	aura.light_color = Color(0.72, 0.68, 0.62)
-	aura.light_energy = 0.34
-	aura.omni_range = 2.1
-	aura.position = Vector3(0, 1.5, 0)
-	inst.add_child(aura)
+	if veil_style:
+		# v25 : sac de jute = suivi de l'os head par frame (BoneAttachment se placait au torse)
+		veil_skel = sk
+		var sack := MeshInstance3D.new()
+		var skm := SphereMesh.new()
+		skm.radius = 0.082
+		skm.height = 0.20
+		sack.mesh = skm
+		sack.scale = Vector3(1.05, 1.45, 1.15)
+		var jm := _simple(Color(0.42, 0.30, 0.17), 0.95)
+		jm.normal_enabled = true
+		jm.normal_texture = load("res://assets/tex/skin_normal.png")
+		jm.normal_scale = 2.2
+		sack.material_override = jm
+		inst.add_child(sack)
+		veil_sack = sack
+		var aura := OmniLight3D.new()
+		aura.light_color = Color(0.72, 0.68, 0.62)
+		aura.light_energy = 0.34
+		aura.omni_range = 2.1
+		aura.position = Vector3(0, 1.5, 0)
+		inst.add_child(aura)
+	inst.scale = Vector3(scl, scl, scl)
 	_ent_audio_attach(inst)
 	if dbg != "":
-		print("DBG entity=RIG SKINNE os=%d tri=%d" % [sk.get_bone_count(), _rig_tri_count(mi)])
+		print("DBG entity=RIG %s os=%d tri=%d ech=%.2f" % [glb.get_file(), sk.get_bone_count(), _rig_tri_count(mi), scl])
 	return inst
+
+
+func _build_entity_rig() -> Node3D:
+	# v19 : la creature skinee — un seul maillage, un squelette de 21 os
+	# v27 : delegue au constructeur generique (la Voilee garde son style)
+	return _build_entity_creature("res://assets/models/monstre_rig.glb", "res://assets/models/monstre_sole.json", rig_scale, "", true, false)
 
 
 func _rig_tri_count(mi: MeshInstance3D) -> int:
@@ -1864,20 +1941,36 @@ func _make_entity() -> Node3D:
 
 func _make_entity_kind(kind: int) -> Node3D:
 	# v24 : un monstre par etage — 0 = Voilee (rig anime) · 1 = Enfant de cendre · 2 = Rampant
-	if kind == 1 and ResourceLoader.exists("res://assets/next/enfant_cendre.glb"):
-		var e1 := _load_next("res://assets/next/enfant_cendre.glb", "enfant", Vector3.ZERO, 0.55, 0.0, false, Vector3.ZERO, Vector3.ZERO, false)
-		if e1 != null:
-			_ent_audio_attach(e1)
-			if dbg != "":
-				print("DBG entity=ENFANT CENDRE")
-			return e1
-	if kind == 2 and ResourceLoader.exists("res://assets/next/monstre_rempant.glb"):
-		var e2 := _load_next("res://assets/next/monstre_rempant.glb", "rampant", Vector3.ZERO, 1.14, 0.0, false, Vector3.ZERO, Vector3.ZERO, false)
-		if e2 != null:
-			_ent_audio_attach(e2)
-			if dbg != "":
-				print("DBG entity=RAMPANT")
-			return e2
+	# v27 : l'Enfant de cendre — rig skinne + animation partagee (repli : GLB statique corrige)
+	if kind == 1:
+		if dbg != "norig" and ResourceLoader.exists("res://assets/models/enfant_rig.glb"):
+			var e1r := _build_entity_creature("res://assets/models/enfant_rig.glb", "res://assets/models/enfant_rig_sole.json", 1.15, "enfant")
+			if e1r != null:
+				if dbg != "":
+					print("DBG entity=ENFANT RIG")
+				return e1r
+		if ResourceLoader.exists("res://assets/next/enfant_cendre.glb"):
+			var e1 := _load_next("res://assets/next/enfant_cendre.glb", "enfant", Vector3.ZERO, 0.58, 0.0, false, Vector3.ZERO, Vector3.ZERO, false, true, true)
+			if e1 != null:
+				_ent_audio_attach(e1)
+				if dbg != "":
+					print("DBG entity=ENFANT CENDRE (statique)")
+				return e1
+	if kind == 2:
+		# v27 : le Rampant — rig en posture de rampement (repli : GLB statique corrige)
+		if dbg != "norig" and ResourceLoader.exists("res://assets/models/rampant_rig.glb"):
+			var e2r := _build_entity_creature("res://assets/models/rampant_rig.glb", "res://assets/models/rampant_rig_sole.json", 1.5, "rampant", false, true)
+			if e2r != null:
+				if dbg != "":
+					print("DBG entity=RAMPANT RIG")
+				return e2r
+		if ResourceLoader.exists("res://assets/next/monstre_rempant.glb"):
+			var e2 := _load_next("res://assets/next/monstre_rempant.glb", "rampant", Vector3.ZERO, 0.82, 0.0, false, Vector3.ZERO, Vector3.ZERO, false, true, true)
+			if e2 != null:
+				_ent_audio_attach(e2)
+				if dbg != "":
+					print("DBG entity=RAMPANT (statique)")
+				return e2
 	if rig_enabled and dbg != "nomodel" and dbg != "model1" and dbg != "old" and ResourceLoader.exists("res://assets/models/monstre_rig.glb"):
 		var mr := _build_entity_rig()
 		if mr != null:
@@ -2657,12 +2750,13 @@ func _move_entity_toward(target2: Vector2, spd: float, d: float, tlvl := -1) -> 
 		if ent_ghost_t > 0.0:
 			entity.position = Vector3(np.x, _terrain_y(np, NODE_LVL[tn]), np.y)
 		# v18 : sinon elle ne traverse plus les murs (glissement le long de l'obstacle)
+		# v27fix : Y = _terrain_y (avant : Y force a 0 -> elle marchait SOUS les etages, dans le vide)
 		elif _ent_can_stand(np):
-			entity.position = Vector3(np.x, 0, np.y)
+			entity.position = Vector3(np.x, _terrain_y(np, ent_level), np.y)
 		elif _ent_can_stand(Vector2(np.x, e2.y)):
-			entity.position = Vector3(np.x, 0, e2.y)
+			entity.position = Vector3(np.x, _terrain_y(Vector2(np.x, e2.y), ent_level), e2.y)
 		elif _ent_can_stand(Vector2(e2.x, np.y)):
-			entity.position = Vector3(e2.x, 0, np.y)
+			entity.position = Vector3(e2.x, _terrain_y(Vector2(e2.x, np.y), ent_level), np.y)
 		# v21a : en chasse elle ne tournait JAMAIS (elle courait de travers) -> rotation fluide rapide
 		var rot_spd := 3.6 if entity_mode != 2 else 7.5
 		entity.rotation.y = lerp_angle(entity.rotation.y, atan2(-dirv.x, -dirv.y), minf(1.0, rot_spd * d))
@@ -2700,7 +2794,8 @@ func _spawn_chaser() -> void:
 	if dbg != "":
 		print("DBG spawn node=%d dist_joueur=%.1f (candidats=%s)" % [entity_node, (NODES[entity_node] - p2).length(), str(opts)])
 	entity_target = entity_node
-	entity.position = Vector3(NODES[entity_node].x, 0, NODES[entity_node].y)
+	ent_level = NODE_LVL[entity_node]
+	entity.position = Vector3(NODES[entity_node].x, _terrain_y(NODES[entity_node], ent_level), NODES[entity_node].y)
 	world.add_child(entity)
 	entity_mode = 0
 
@@ -3933,15 +4028,16 @@ func _menu_ent_ensure() -> Node3D:
 
 func _menu_mobs_ensure() -> void:
 	# v25 : TOUS les monstres en arriere-plan du menu — flicker, yeux lumineux, ils se rapprochent
+	# v27fix : flip face (-Z) + pieds au sol ; les yeux sont desormais sur le VRAI visage
 	if menu_mobs.size() > 0:
 		return
 	var defs := [
-		["enfant", "res://assets/next/enfant_cendre.glb", Vector3(7.0, 0, 7.5), 0.55, 0.0, 0.15, Color(0.85, 0.95, 1.0)],
-		["rampant", "res://assets/next/monstre_rempant.glb", Vector3(12.0, 0, 6.1), 1.14, -PI / 2, -1.25, Color(0.9, 0.96, 0.9)],
-		["marionnette", "res://assets/next/monstre_marionnette.glb", Vector3(4.5, 0, 7.7), 1.3, -0.35, 0.0, Color(1.0, 0.55, 0.15)],
+		["enfant", "res://assets/next/enfant_cendre.glb", Vector3(7.0, 0, 7.5), 0.58, 0.0, 0.15, Color(0.85, 0.95, 1.0)],
+		["rampant", "res://assets/next/monstre_rempant.glb", Vector3(12.0, 0, 6.1), 0.82, -PI / 2, -1.25, Color(0.9, 0.96, 0.9)],
+		["marionnette", "res://assets/next/monstre_marionnette.glb", Vector3(4.5, 0, 7.7), 1.05, -0.35, 0.0, Color(1.0, 0.55, 0.15)],
 	]
 	for df in defs:
-		var nd := _load_next(df[1], df[0], df[2], df[3], df[4], false, Vector3.ZERO, Vector3.ZERO, false)
+		var nd := _load_next(df[1], df[0], df[2], df[3], df[4], false, Vector3.ZERO, Vector3.ZERO, false, true, true)
 		if nd == null:
 			continue
 		nd.rotation.x = df[5]
@@ -3952,7 +4048,7 @@ func _menu_mobs_ensure() -> void:
 			es2.radius = 0.028 * df[3]
 			e.mesh = es2
 			e.material_override = _emissive(df[6], 2.2, "")
-			e.position = Vector3(ex * 0.055 * df[3], 0.80 * df[3], -0.075 * df[3])
+			e.position = Vector3(ex * 0.055 * df[3], 1.72 * df[3], -0.10 * df[3])
 			nd.add_child(e)
 		menu_mobs.append({"nd": nd, "t": randf_range(0.8, 2.5), "vis": true, "base": df[2]})
 
@@ -4244,12 +4340,13 @@ func _process(d: float) -> void:
 		var want_w := (-80.0 + wx * 62.0) if player_level == 0 else -80.0
 		wing_pl.volume_db = lerpf(wing_pl.volume_db, want_w, minf(1.0, 2.0 * d))
 	# v24 : postures des chasseurs — Rampant a quatre pattes, Enfant voute
+	# v27fix : signe corrige apres la bascule de face (-Z) : X negatif = penche vers l'avant
 	if entity != null and is_instance_valid(entity):
 		if ent_kind == 2:
 			entity.rotation.x = -1.25 + sin(run_time * 9.0) * (0.07 if entity_mode == 2 else 0.03)
 			entity.rotation.z = sin(run_time * 4.5) * 0.05
 		elif ent_kind == 1:
-			entity.rotation.x = 0.22 + sin(run_time * 7.0) * 0.02
+			entity.rotation.x = -0.18 + sin(run_time * 7.0) * 0.02
 			entity.rotation.z = sin(run_time * 3.1) * 0.06
 		elif entity.rotation.x != 0.0 or entity.rotation.z != 0.0:
 			entity.rotation.x = 0.0
@@ -4425,7 +4522,10 @@ func _process(d: float) -> void:
 		var old := entity
 		entity = _make_entity()
 		world.add_child(entity)
-		entity.position = oldp
+		# v27fix : le nouveau monstre se place AU BON ETAGE (avant : il gardait l'ancien Y / 0)
+		ent_level = want_kind
+		entity_path.clear()
+		entity.position = Vector3(oldp.x, _terrain_y(Vector2(oldp.x, oldp.z), ent_level), oldp.z)
 		entity.rotation.y = oldr
 		if is_instance_valid(old):
 			old.queue_free()
@@ -4443,7 +4543,9 @@ func _process(d: float) -> void:
 	if hidden and entity_mode != 0:
 		entity_mode = 0
 		entity_target = _node_of(epos2, ent_level)
-	var hear_r := noise * 14.0
+	# v27fix : elle entend ton COEUR — rayon minimum meme en silence (avant : elle ne venait JAMAIS
+	# sans bruit, « a une certaine distance il ne s'approche pas »)
+	var hear_r := maxf(noise * 14.0, 5.5)
 	if _ent_asleep():
 		# v17 : dormance — elle reste invisible et immobile loin dans la maison (demande utilisateur)
 		hear_r = 0.0
@@ -4508,11 +4610,13 @@ func _process(d: float) -> void:
 	if ent_dash_t > 0.0:
 		ent_dash_t -= d
 	var moving3: bool = player.velocity.length() > 0.6
-	if seen3 and not moving3 and dist > 3.0 and ent_dash_t <= 0.0:
+	# v27fix : la figee sous le regard ne joue qu'a MOINS de 8 m — de loin elle continue de
+	# s'approcher meme si tu la regardes (avant : elle se clouait a n'importe quelle distance)
+	if seen3 and not moving3 and dist > 3.0 and dist < 8.0 and ent_dash_t <= 0.0:
 		ent_freeze_t += d
 	else:
 		ent_freeze_t = maxf(0.0, ent_freeze_t - d * 2.0)
-	var freeze_now := seen3 and not moving3 and dist > 3.0 and ent_freeze_t < 6.0 and ent_dash_t <= 0.0
+	var freeze_now := seen3 and not moving3 and dist > 3.0 and dist < 8.0 and ent_freeze_t < 6.0 and ent_dash_t <= 0.0
 	if ent_freeze_t >= 6.0 and seen3 and ent_dash_t <= 0.0:
 		# anti-blocage : elle ne reste JAMAIS statufiee plus de 6 s -> elle fonce
 		ent_dash_t = 1.6
@@ -4615,6 +4719,15 @@ func _process(d: float) -> void:
 					if pool.is_empty():
 						pool = nb.duplicate()
 					var pick: int = pool[rng.randi_range(0, pool.size() - 1)]
+					# v27fix : patrouille biaisee vers toi — elle te cherche vraiment, elle derive
+					# vers ta position (avant : errance aleatoire, « elle ne s'approche pas »)
+					if rng.randf() < 0.65:
+						var bd2 := 1e9
+						for cand2 in pool:
+							var dd2: float = (NODES[cand2] - p2z).length()
+							if dd2 < bd2:
+								bd2 = dd2
+								pick = cand2
 					if (NODES[pick] - exit_pos).length() < 3.5 and (p2z - epos2).length() > 8.0 and pool.size() > 1:
 						for alt in pool:
 							if (NODES[alt] - exit_pos).length() >= 3.5:
@@ -5629,13 +5742,82 @@ func _rig_st(nd: Node3D) -> Dictionary:
 	return st
 
 
+func _anim_entity_crawl(nd: Node3D, st: Dictionary, sk: Skeleton3D, d: float, tt2: float, p2z: Vector2, mode: int, speed_mps: float, M: Dictionary) -> void:
+	# v27 : le RAMPANT — posture de rampement en FK (bras et jambes plies, balancement de reptile)
+	# le corps est deja bascule en avant par le code de posture (rotation.x du noeud)
+	var amp := 1.2 if mode == 2 else (0.95 if mode == 1 else 0.55)
+	var sp := speed_mps / maxf(0.01, float(M["scale"]))
+	if sp > 0.03:
+		st["gait"] = float(st["gait"]) + sp * d * 1.35
+	var g: float = st["gait"]
+	# regard : la tete te cherche
+	var look := 0.0
+	var dirw := p2z - Vector2(nd.position.x, nd.position.z)
+	if dirw.length_squared() > 0.01:
+		look = clampf(wrapf(atan2(-dirw.x, -dirw.y) - nd.rotation.y, -PI, PI), -1.1, 1.1)
+	if not st.has("look"):
+		st["look"] = 0.0
+	st["look"] = lerpf(float(st["look"]), look, minf(1.0, 5.0 * d))
+	var sw := sin(TAU * g)
+	var sw2 := sin(TAU * g + PI)
+	var resp := 0.035 * sin(tt2 * (3.1 if mode >= 1 else 1.25))
+	# bassin + colonne (X negatif = penche vers l'avant, face a -Z)
+	_rig_pose(sk, "hips", [[Vector3(1, 0, 0), -0.10], [Vector3(0, 0, 1), 0.10 * sw * amp * 0.5]])
+	_rig_pose(sk, "spine", [[Vector3(1, 0, 0), -0.16], [Vector3(0, 0, 1), -0.07 * sw * amp]])
+	_rig_pose(sk, "chest", [[Vector3(1, 0, 0), -0.10 + resp], [Vector3(0, 0, 1), 0.06 * sw2 * amp], [Vector3(0, 1, 0), 0.10 * sw * amp]])
+	_rig_pose(sk, "neck", [[Vector3(1, 0, 0), 0.34], [Vector3(0, 1, 0), float(st["look"]) * 0.35]])
+	_rig_pose(sk, "head", [[Vector3(1, 0, 0), 0.82 + 0.06 * sin(tt2 * 2.3)],
+		[Vector3(0, 1, 0), float(st["look"]) * 0.65 + 0.05 * sin(tt2 * 0.7)],
+		[Vector3(0, 0, 1), 0.07 * sin(tt2 * 1.7)]])
+	# bras : en avant, legerement en dessous (Z = affaissement), alternes
+	var reach_a := 1.22 if mode == 2 else (1.05 if mode == 1 else 0.80)
+	_rig_pose(sk, "upperarmL", [[Vector3(0, 1, 0), -reach_a + 0.18 * sw], [Vector3(0, 0, 1), 0.50]])
+	_rig_pose(sk, "upperarmR", [[Vector3(0, 1, 0), reach_a + 0.18 * sw2], [Vector3(0, 0, 1), -0.50]])
+	_rig_pose(sk, "forearmL", [[Vector3(0, 1, 0), -0.42 - 0.15 * sw]])
+	_rig_pose(sk, "forearmR", [[Vector3(0, 1, 0), 0.42 + 0.15 * sw2]])
+	_rig_pose(sk, "handL", [[Vector3(1, 0, 0), -0.25]])
+	_rig_pose(sk, "handR", [[Vector3(1, 0, 0), -0.25]])
+	_rig_pose(sk, "clavL", [[Vector3(0, 0, 1), -0.18]])
+	_rig_pose(sk, "clavR", [[Vector3(0, 0, 1), 0.18]])
+	# jambes : cuisses en avant sous le corps (X+ = os descendant vers l'avant), genoux plies
+	var hip_f := 0.95 if mode == 2 else 0.80
+	_rig_pose(sk, "thighL", [[Vector3(1, 0, 0), hip_f + 0.30 * sw]])
+	_rig_pose(sk, "thighR", [[Vector3(1, 0, 0), hip_f + 0.30 * sw2]])
+	_rig_pose(sk, "shinL", [[Vector3(1, 0, 0), -1.15 - 0.22 * sw]])
+	_rig_pose(sk, "shinR", [[Vector3(1, 0, 0), -1.15 - 0.22 * sw2]])
+	_rig_pose(sk, "footL", [[Vector3(1, 0, 0), 0.42]])
+	_rig_pose(sk, "footR", [[Vector3(1, 0, 0), 0.42]])
+	_rig_pose(sk, "toeL", [])
+	_rig_pose(sk, "toeR", [])
+	# bassin : translation (petit balancement vertical de reptile)
+	var ih := sk.find_bone("hips")
+	if ih >= 0:
+		var rp := sk.get_bone_rest(ih).origin
+		sk.set_bone_pose_position(ih, rp + Vector3(0, -0.035 + 0.030 * absf(sw) * amp * 0.6, 0))
+	# pas : un souffle de griffes par demi-cycle
+	if ent_step != null and is_instance_valid(ent_step) and nd == entity and sp > 0.03:
+		if floor(g * 2.0) != floor(float(st["step"]) * 2.0):
+			st["step"] = g
+			if not ent_step.playing:
+				ent_step.pitch_scale = 0.85
+				ent_step.play()
+
+
 func _anim_entity_rig(nd: Node3D, d: float, tt2: float, p2z: Vector2, mode: int, speed_mps: float) -> void:
 	# v19 : animation de la creature skinee — jambes en IK, buste et bras en cinématique
 	var st := _rig_st(nd)
 	if st.is_empty():
 		return
 	var sk: Skeleton3D = st["skel"]
-	var md: Dictionary = RIG_MODES[clampi(mode, 0, 4)]
+	var M: Dictionary = st.get("M", {})
+	if M.is_empty():
+		return
+	# v27 : mode rampement (le Rampant) — FK plie, pas d'IK jambes
+	if st.get("crawl", false):
+		_anim_entity_crawl(nd, st, sk, d, tt2, p2z, mode, speed_mps, M)
+		return
+	var modes: Dictionary = st.get("modes", RIG_MODES)
+	var md: Dictionary = modes[clampi(mode, 0, 4)]
 	# ---- v23 : saccades nerveuses (plus d'articulations visibles) + lunge de sprint ----
 	if not st.has("tw_t"):
 		st["tw_t"] = 0.0
@@ -5662,7 +5844,7 @@ func _anim_entity_rig(nd: Node3D, d: float, tt2: float, p2z: Vector2, mode: int,
 		can[key] = lerpf(float(can[key]), float(md[key]), kk)
 	can["head_y"] = lerpf(float(can["head_y"]), look, minf(1.0, 6.0 * d))
 	# --- allure : la phase avance avec la DISTANCE parcourue (l'appui dure 0,62 cycle)
-	var sp := speed_mps / rig_scale
+	var sp := speed_mps / maxf(0.01, float(M["scale"]))
 	if sp > 0.03:
 		st["gait"] = float(st["gait"]) + (sp * d) / maxf(0.08, float(can["stride"]) / 0.62)
 	var g: float = st["gait"]
@@ -5671,15 +5853,15 @@ func _anim_entity_rig(nd: Node3D, d: float, tt2: float, p2z: Vector2, mode: int,
 	var hips_pitch: float = can["lean"] * 0.30
 	var hips_roll := sway * 0.55
 	# --- bassin : hauteur calee sur la foulee maximale (constant sur le cycle : pas de pompage)
-	var half_max := minf(float(can["stride"]) * 0.5, rig_chain * 0.90)
+	var half_max := minf(float(can["stride"]) * 0.5, float(M["chain"]) * 0.90)
 	# marge de 3,5 % sur la chaine : la jambe n'atteint JAMAIS sa butee (sinon l'IK sature
 	# et le pied pose se met a flotter)
-	var reach := rig_chain * 0.965
+	var reach := float(M["chain"]) * 0.965
 	var need := sqrt(maxf(0.0009, reach * reach - half_max * half_max))
 	var bob := 0.020 * amp * absf(sin(TAU * g))
 	# le bassin monte/descend, mais la distance hanche->cheville reste constante :
 	# sans cette compensation la jambe s'allonge et le pied pose se met a flotter (7 cm)
-	var hips_off := (rig_y_ank + need) - rig_y_hip - bob
+	var hips_off := (float(M["y_ank"]) + need) - float(M["y_hip"]) - bob
 	# --- jambes : IK 2 os, pied pose au sol
 	for side in ["L", "R"]:
 		var ph: float = fmod(g + (0.0 if side == "L" else 0.5), 1.0)
@@ -5696,21 +5878,21 @@ func _anim_entity_rig(nd: Node3D, d: float, tt2: float, p2z: Vector2, mode: int,
 			lift = 0.14 * pow(sin(PI * u), 0.75) * (1.0 if mode >= 1 else 0.6)
 			plantar = -0.22 * sin(PI * u)
 		var sgn := 1.0 if side == "L" else -1.0
-		var dz := -fwd - (absf(rig_y_hip * 0.0) + 0.058) * sin(0.09 * amp * sin(TAU * g)) * sgn
-		var hip_y := rig_y_hip + hips_off + bob
-		var ank_y := lift + rig_y_ank + maxf(0.0, rig_sole_k0 - _rig_sole_low(plantar)) + 0.004
+		var dz := -fwd - 0.058 * sin(0.09 * amp * sin(TAU * g)) * sgn
+		var hip_y := float(M["y_hip"]) + hips_off + bob
+		var ank_y := lift + float(M["y_ank"]) + maxf(0.0, float(M["sole_k0"]) - _rig_sole_low(plantar, M["sole"])) + 0.004
 		var down := hip_y - ank_y
-		var dist := minf(rig_chain, sqrt(dz * dz + down * down))
-		var cosk := (rig_l_thigh * rig_l_thigh + rig_l_shin * rig_l_shin - dist * dist) / (2.0 * rig_l_thigh * rig_l_shin)
+		var dist := minf(float(M["chain"]), sqrt(dz * dz + down * down))
+		var cosk := (float(M["l_thigh"]) * float(M["l_thigh"]) + float(M["l_shin"]) * float(M["l_shin"]) - dist * dist) / (2.0 * float(M["l_thigh"]) * float(M["l_shin"]))
 		var knee := PI - acos(clampf(cosk, -1.0, 1.0))
-		var cosc := (rig_l_thigh * rig_l_thigh + dist * dist - rig_l_shin * rig_l_shin) / (2.0 * rig_l_thigh * dist)
+		var cosc := (float(M["l_thigh"]) * float(M["l_thigh"]) + dist * dist - float(M["l_shin"]) * float(M["l_shin"])) / (2.0 * float(M["l_thigh"]) * dist)
 		var beta := atan2(-dz, down)
 		var thigh_a := beta + acos(clampf(cosc, -1.0, 1.0))
 		var shin_abs := thigh_a - knee
 		var fil: Dictionary = st["fil"]
-		fil["thigh" + side] = lerpf(float(fil["thigh" + side]), (thigh_a - rig_b_thigh) - hips_pitch, minf(1.0, 16.0 * d))
-		fil["shin" + side] = lerpf(float(fil["shin" + side]), (shin_abs - thigh_a) - (rig_b_shin - rig_b_thigh), minf(1.0, 16.0 * d))
-		fil["foot" + side] = lerpf(float(fil["foot" + side]), (rig_b_foot + plantar) - shin_abs - (rig_b_foot - rig_b_shin), minf(1.0, 16.0 * d))
+		fil["thigh" + side] = lerpf(float(fil["thigh" + side]), (thigh_a - float(M["b_thigh"])) - hips_pitch, minf(1.0, 16.0 * d))
+		fil["shin" + side] = lerpf(float(fil["shin" + side]), (shin_abs - thigh_a) - (float(M["b_shin"]) - float(M["b_thigh"])), minf(1.0, 16.0 * d))
+		fil["foot" + side] = lerpf(float(fil["foot" + side]), (float(M["b_foot"]) + plantar) - shin_abs - (float(M["b_foot"]) - float(M["b_shin"])), minf(1.0, 16.0 * d))
 		_rig_pose(sk, "thigh" + side, [[Vector3(1, 0, 0), float(fil["thigh" + side])],
 			[Vector3(0, 0, 1), -sgn * sway * 0.35 - hips_roll]])
 		_rig_pose(sk, "shin" + side, [[Vector3(1, 0, 0), float(fil["shin" + side])]])
@@ -5833,16 +6015,23 @@ func _ent_asleep() -> bool:
 
 func _ent_can_stand(p2: Vector2) -> bool:
 	# v18 : verifie qu'aucun mur ne bloque la creature a cet endroit (capsule de 0,45 m de rayon)
+	# v27fix : hauteur de test a l'ETAGE de la creature + verification du SOL (evite les trous,
+	# ex. la tremie / le vide de l'ascenseur : elle y marchait, jambes dans le vide)
 	if world == null or not world.is_inside_tree():
 		return true
 	var space := world.get_world_3d().direct_space_state
 	if space == null:
 		return true
+	var fy := _terrain_y(p2, ent_level)
+	var rq := PhysicsRayQueryParameters3D.create(Vector3(p2.x, fy + 1.2, p2.y), Vector3(p2.x, fy - 0.7, p2.y), 1)
+	var rh := space.intersect_ray(rq)
+	if rh.is_empty() or absf((rh["position"] as Vector3).y - fy) > 0.45:
+		return false
 	var q := PhysicsShapeQueryParameters3D.new()
 	var sh := SphereShape3D.new()
 	sh.radius = 0.50
 	q.shape = sh
-	q.transform = Transform3D(Basis(), Vector3(p2.x, 1.05, p2.y))
+	q.transform = Transform3D(Basis(), Vector3(p2.x, fy + 1.05, p2.y))
 	q.collision_mask = 1
 	q.collide_with_bodies = true
 	q.collide_with_areas = false
